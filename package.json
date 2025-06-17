@@ -7,6 +7,8 @@
     "test": "tests"
   },
   "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
     "test": "mocha"
   },
   "repository": {
@@ -18,5 +20,16 @@
   "bugs": {
     "url": "https://github.com/riannbarbosa/HealthMgmt-Contract-TCCII/issues"
   },
-  "homepage": "https://github.com/riannbarbosa/HealthMgmt-Contract-TCCII#readme"
+  "homepage": "https://github.com/riannbarbosa/HealthMgmt-Contract-TCCII#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "ethers": "^6.14.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui": "^5.22.0",
+    "swagger-ui-dist": "^5.22.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
 }
