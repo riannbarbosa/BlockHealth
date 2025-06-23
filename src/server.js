@@ -1,6 +1,7 @@
 const express = require('express');
 const { ethers } = require('ethers');
 const cors = require('cors');
+require('dotenv').config();
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const HManagerContract = require('../build/contracts/HManager.json'); // Adjust the path to your contract JSON
@@ -14,17 +15,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Ethers setup
-const provider = new ethers.JsonRpcProvider('http://localhost:8545'); // Replace with your Ethereum node URL
+const provider = new ethers.JsonRpcProvider(process.env.NODE_URL);
+console.log(provider, 'TESTE')
 let hManagerContract;
+let contractReady = false;
 
 // Contract setup
 const setupContract = async () => {
   try {
+    const block = await provider.getBlockNumber();
+    console.log("Connected to node, block:", block);
     const network = await provider.getNetwork();
-    const deployedAddress = HManagerContract.networks[network.chainId]?.address;
-    
+    const chainIdStr = network.chainId.toString();
+    console.log("Network info:", HManagerContract.networks[chainIdStr]?.address);
+    console.log("Artifact networks keys:", Object.keys(HManagerContract.networks));
+    const deployedAddress = HManagerContract.networks[chainIdStr]?.address;
     if (!deployedAddress) {
-      console.error('Contract not deployed on the current network');
+      console.error('Contract not deployed on the current network (chainId:', network.chainId, ')');
+      contractReady = false;
       return;
     }
     
@@ -34,14 +42,30 @@ const setupContract = async () => {
       provider
     );
     
-    console.log('Contract setup complete');
+    contractReady = true;
+    console.log('Contract setup complete - API is now available');
   } catch (error) {
     console.error('Error setting up contract:', error);
+    contractReady = false;
   }
 };
 
-// Setup contract on startup
 setupContract();
+
+// Remove the status endpoint completely
+// app.get('/status', (req, res) => { ... }); // DELETE THIS
+
+// Updated middleware to block ALL routes when contract not ready
+app.use((req, res, next) => {
+  if (!contractReady || !hManagerContract) {
+    return res.status(503).json({
+      success: false,
+      message: 'Contract is not connected. Please check your blockchain connection and contract deployment.'
+    });
+  }
+  req.hManagerContract = hManagerContract;
+  next();
+});
 
 // Swagger configuration
 const swaggerOptions = {
@@ -56,7 +80,8 @@ const swaggerOptions = {
       {
         url: 'http://localhost:3000',
         description: 'Development server',
-      },    ],
+      },
+    ],
   },
   apis: [__dirname + '/server.js'], // Path to the API docs
 };
@@ -64,21 +89,17 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-// Helper function to get signer
-const getSigner = async (req) => {
-  // In a real application, you would handle wallet connections securely.
-  // For this example, we'll assume a private key is provided or use a default signer.
-  // **WARNING: Storing private keys directly in code is not recommended for production.**
-  const privateKey = req.body.privateKey; // Assuming private key is sent in the request body
-  
+// Helper function to get signer (remove console.log for security)
+const getSigner = async () => {
+  const privateKey = process.env.PRIVATE_KEY;
+  console.log(privateKey, 'FF', provider); // This line is for debugging purposes, remove it in production
+  // Remove this line: console.log(privateKey, 'FF')
   if (privateKey) {
     const wallet = new ethers.Wallet(privateKey, provider);
     return wallet;
   } else {
-    // Fallback to a default signer if no private key is provided (e.g., for read-only operations)
-    // This might require the node to have unlocked accounts or using a different provider setup
     console.warn("No private key provided. Using provider for read-only operations.");
-    return provider; // Return provider for read-only calls
+    return provider;
   }
 };
 
@@ -97,11 +118,10 @@ const getSigner = async (req) => {
  *     Patient:
  *       type: object
  *       required:
- *         - address
+ *         - patientId
  *         - name
- *         - privateKey
  *       properties:
- *         address:
+ *         patientId:
  *           type: string
  *           description: Ethereum address of the patient
  *         name:
@@ -110,6 +130,14 @@ const getSigner = async (req) => {
  *         privateKey:
  *           type: string
  *           description: Private key of the doctor's Ethereum account
+ *     AddDoctorRequest:
+ *       type: object
+ *       required:
+ *         - doctorId
+ *       properties:
+ *         doctorId:
+ *           type: string
+ *           description: Ethereum address of the doctor to add
  *     PatientRecord:
  *       type: object
  *       required:
@@ -119,7 +147,6 @@ const getSigner = async (req) => {
  *         - patientId
  *         - diagnosis
  *         - treatment
- *         - privateKey
  *       properties:
  *         cid:
  *           type: string
@@ -139,46 +166,64 @@ const getSigner = async (req) => {
  *         treatment:
  *           type: string
  *           description: Treatment plan
- *         privateKey:
- *           type: string
- *           description: Private key of the doctor's Ethereum account
  */
+
+
 
 /**
  * @swagger
  * /api/doctors:
  *   post:
- *     summary: Register a new doctor
+ *     summary: Add a new doctor (only owner can do this)
  *     tags: [Doctors]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Doctor'
+ *             $ref: '#/components/schemas/AddDoctorRequest'
  *     responses:
  *       200:
- *         description: Doctor registered successfully
+ *         description: Doctor added successfully
+ *       400:
+ *         description: Bad request - missing doctorId or invalid private key
  *       500:
  *         description: Server error
  */
 app.post('/api/doctors', async (req, res) => {
   try {
-    const signer = await getSigner(req);
-    if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
+    const { doctorId } = req.body; // Expecting doctorId in the request body
+    console.log('Received doctorId:', req.body);
+    console.log('Adding doctor with ID:', doctorId);
+    const signer = await getSigner();
+    console.log('Signer:', signer);
+    console.log(signer.sendTransaction, 'FAF', doctorId);
+
+    if (!signer || !signer.sendTransaction) {
+      console.log('signer is not valid or does not support sending transactions');
+      
         return res.status(400).json({
             success: false,
             message: 'Valid private key required for this operation'
         });
     }
+    console.log('Signer is valid:', signer);
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doctor ID (address) is required'
+      });
+    }
     const contractWithSigner = hManagerContract.connect(signer);
+    console.log('Contract with signer:', contractWithSigner);
     
-    const tx = await contractWithSigner.addDoctor();
+    const tx = await contractWithSigner.addDoctor(doctorId);
     await tx.wait(); // Wait for the transaction to be mined
     
     res.status(200).json({
       success: true,
-      message: 'Doctor registered successfully',
+      message: 'Doctor added successfully',
       transactionHash: tx.hash
     });
   } catch (error) {
@@ -195,7 +240,7 @@ app.post('/api/doctors', async (req, res) => {
  * @swagger
  * /api/doctors/{doctorId}:
  *   delete:
- *     summary: Revoke a doctor's access
+ *     summary: Revoke a doctor's access (only owner can do this)
  *     tags: [Doctors]
  *     parameters:
  *       - in: path
@@ -204,12 +249,6 @@ app.post('/api/doctors', async (req, res) => {
  *           type: string
  *         required: true
  *         description: Ethereum address of the doctor
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Doctor'
  *     responses:
  *       200:
  *         description: Doctor revoked successfully
@@ -218,7 +257,7 @@ app.post('/api/doctors', async (req, res) => {
  */
 app.delete('/api/doctors/:doctorId', async (req, res) => {
   try {
-    const signer = await getSigner(req);
+    const signer = await getSigner();
      if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
         return res.status(400).json({
             success: false,
@@ -228,7 +267,7 @@ app.delete('/api/doctors/:doctorId', async (req, res) => {
     const doctorId = req.params.doctorId;
     const contractWithSigner = hManagerContract.connect(signer);
     
-    const tx = await contractWithSigner.revokeDoctor(doctorId);
+    const tx = await contractWithSigner.revokeDoctorAuth(doctorId);
     await tx.wait(); // Wait for the transaction to be mined
     
     res.status(200).json({
@@ -267,7 +306,11 @@ app.delete('/api/doctors/:doctorId', async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 isDoctor:
+ *                 success:
+ *                   type: boolean
+ *                 doctorId:
+ *                   type: string
+ *                 isAuthorized:
  *                   type: boolean
  *       500:
  *         description: Server error
@@ -276,11 +319,12 @@ app.get('/api/doctors/:doctorId', async (req, res) => {
   try {
     const doctorId = req.params.doctorId;
     
-    const isDoctor = await hManagerContract.doctors(doctorId);
+    const doctor = await hManagerContract.doctors(doctorId);
     
     res.status(200).json({
       success: true,
-      isDoctor: isDoctor
+      doctorId: doctor.id,
+      isAuthorized: doctor.isAuthorized
     });
   } catch (error) {
     console.error('Error checking doctor status:', error);
@@ -312,9 +356,9 @@ app.get('/api/doctors/:doctorId', async (req, res) => {
  */
 app.post('/api/patients', async (req, res) => {
   try {
-    const { patientId, name } = req.body;
-    const signer = await getSigner(req);
-     if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
+    const { patientId, name } = req.body; // Changed from address to patientId
+    const signer = await getSigner();
+     if (!signer || !signer.sendTransaction) {
         return res.status(400).json({
             success: false,
             message: 'Valid private key required for this operation'
@@ -330,7 +374,7 @@ app.post('/api/patients', async (req, res) => {
     const contractWithSigner = hManagerContract.connect(signer);
     
     const tx = await contractWithSigner.addPatient(patientId, name);
-    await tx.wait(); // Wait for the transaction to be mined
+    await tx.wait();
     
     res.status(200).json({
       success: true,
@@ -351,18 +395,10 @@ app.post('/api/patients', async (req, res) => {
  * @swagger
  * /api/patients:
  *   get:
- *     summary: Get all patients information
+ *     summary: Get all patients information (only authorized doctors can access)
  *     tags: [Patients]
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               account:
- *                 type: string
- *                 description: Ethereum address of the sender (doctor) - not required for this read-only operation
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of all patients
@@ -371,14 +407,29 @@ app.post('/api/patients', async (req, res) => {
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Patient'
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   name:
+ *                     type: string
+ *       400:
+ *         description: Unauthorized - valid private key required
  *       500:
  *         description: Server error
  */
 app.get('/api/patients', async (req, res) => {
+  const signer = await getSigner();
   try {
-    // No signer needed for read-only call
-    const patients = await hManagerContract.getAllPatientsInfo();
+    if (!signer) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid private key required - only authorized doctors can access patient list'
+        });
+    }
+    
+    const contractWithSigner = hManagerContract.connect(signer);
+    const patients = await contractWithSigner.getAllPatientsInfo();
     
     res.status(200).json({
       success: true,
@@ -406,14 +457,18 @@ app.get('/api/patients', async (req, res) => {
  *         schema:
  *           type: string
  *         required: true
- *         description: Ethereum address of the patient
+ *         description: Ethereum address of the patient 
  *     responses:
  *       200:
  *         description: Patient information
  *         content:
  *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Patient'
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 name:
+ *                   type: string
  *       500:
  *         description: Server error
  */
@@ -453,12 +508,6 @@ app.get('/api/patients/:patientId', async (req, res) => {
  *           type: string
  *         required: true
  *         description: Ethereum address of the patient
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Doctor'
  *     responses:
  *       200:
  *         description: Patient removed successfully
@@ -468,17 +517,19 @@ app.get('/api/patients/:patientId', async (req, res) => {
 app.delete('/api/patients/:patientId', async (req, res) => {
   try {
     const patientId = req.params.patientId;
-    const signer = await getSigner(req);
-     if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
+    const signer = await getSigner();
+    
+    if (!signer || !signer.sendTransaction) {
         return res.status(400).json({
             success: false,
             message: 'Valid private key required for this operation'
         });
     }
+    
     const contractWithSigner = hManagerContract.connect(signer);
     
     const tx = await contractWithSigner.removePatient(patientId);
-    await tx.wait(); // Wait for the transaction to be mined
+    await tx.wait();
     
     res.status(200).json({
       success: true,
@@ -516,7 +567,7 @@ app.delete('/api/patients/:patientId', async (req, res) => {
 app.post('/api/records', async (req, res) => {
   try {
     const { cid, fileName, patientName, patientId, diagnosis, treatment } = req.body;
-    const signer = await getSigner(req);
+    const signer = await getSigner();
      if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
         return res.status(400).json({
             success: false,
@@ -580,8 +631,78 @@ app.post('/api/records', async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/PatientRecord'
  *       500:
- *         descrip
-(Content truncated due to size limit. Use line ranges to read in chunks)
-*/
+ *         description: Server error
+ */
+app.get('/api/records/:patientId', async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+    const signer = await getSigner();
+    if (!signer) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid private key required - only authorized doctors can access patient records'
+        });
+    }  
+    const contractWithSigner = hManagerContract.connect(signer);
+    const records = await contractWithSigner.getPatientRecords(patientId);
+    
+    res.status(200).json({
+      success: true,
+      records: records
+    });
+  } catch (error) {
+    console.error('Error getting patient records:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting patient records',
+      error: error.message
+    });
+  }
+});
 
+/**
+ * @swagger
+ * /api/patients/{patientId}/exists:
+ *   get:
+ *     summary: Check if a patient exists
+ *     tags: [Patients]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Ethereum address of the patient
+ *     responses:
+ *       200:
+ *         description: Patient existence status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 exists:
+ *                   type: boolean
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/patients/:patientId/exists', async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+    
+    const exists = await hManagerContract.getPatientExists(patientId);
+    
+    res.status(200).json({
+      success: true,
+      exists: exists
+    });
+  } catch (error) {
+    console.error('Error checking patient existence:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking patient existence',
+      error: error.message
+    });
+  }
+});
 module.exports = app;

@@ -7,3 +7,5 @@ logs
 
 build
 dist
+
+.env

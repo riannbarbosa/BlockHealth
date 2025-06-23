@@ -3,6 +3,12 @@ pragma solidity >=0.4.22 <0.9.0;
 
 contract HManager {
 
+ address public owner;
+
+    constructor() {
+        owner = msg.sender; // Set deployer as owner
+    }
+
     struct Record {
         string cid;
         string fileName;
@@ -25,9 +31,13 @@ contract HManager {
         address id;
         string name;
     }
+    struct Doctor {
+        address id;
+        bool isAuthorized;
+    }
 
     mapping(address => Patient) public patients;
-    mapping(address => bool) public doctors;
+    mapping(address => Doctor) public doctors;
     address[] public patientList;
 
     event PatientAdded(address patientId);
@@ -36,14 +46,17 @@ contract HManager {
     event DoctorRemoved(address doctorId);
     event RecordAdded(string cid, address patientId, address doctorId); 
 
-
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
     modifier patientExists(address patientId) {
         require(patients[patientId].id == patientId, "Patient does not exist");
         _;
     }
 
     modifier onlyAuthProvider() {
-        require(doctors[msg.sender], "Not an authorized provider");
+       require(doctors[msg.sender].isAuthorized, "Not an authorized provider");
         _;
     }
 
@@ -82,16 +95,17 @@ contract HManager {
 
     }
 
-   function addDoctor() public {
-       require(!doctors[msg.sender], "Account is already a doctor");
-       doctors[msg.sender] = true;
-       emit DoctorAdded(msg.sender);
+   function addDoctor(address _doctorId) public onlyOwner {
+        require(!doctors[_doctorId].isAuthorized, "Account is already a doctor");
+        doctors[_doctorId].id = _doctorId;
+        doctors[_doctorId].isAuthorized = true;
+        emit DoctorAdded(_doctorId);
    }
 
 
-       function revokeDoctor(address _doctorId) public {
-        require(doctors[_doctorId], "This doctor does not exist");
-        doctors[_doctorId] = false;
+    function revokeDoctorAuth(address _doctorId) public onlyOwner {
+        require(doctors[_doctorId].isAuthorized, "This doctor does not exist or is not authorized");
+        doctors[_doctorId].isAuthorized = false;
         emit DoctorRemoved(_doctorId);
     }
 
@@ -99,7 +113,6 @@ contract HManager {
     function removePatient(address _patientId) public onlyAuthProvider {
         require(patients[_patientId].id == _patientId, "Patient does not exist");
         patients[_patientId].id = address(0); // Mark as removed
-
         emit PatientRemoved(_patientId);
     }
 
@@ -126,5 +139,9 @@ contract HManager {
             result[i] = infos[i];
         }
         return result;
+    }
+
+    function getPatientExists(address _patientId) public view returns (bool) {
+        return patients[_patientId].id == _patientId;
     }
 }
