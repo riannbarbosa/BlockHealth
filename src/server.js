@@ -112,9 +112,6 @@ const getSigner = async () => {
  *       required:
  *         - privateKey
  *       properties:
- *         privateKey:
- *           type: string
- *           description: Private key of the doctor's Ethereum account
  *     Patient:
  *       type: object
  *       required:
@@ -127,9 +124,6 @@ const getSigner = async () => {
  *         name:
  *           type: string
  *           description: Name of the patient
- *         privateKey:
- *           type: string
- *           description: Private key of the doctor's Ethereum account
  *     AddDoctorRequest:
  *       type: object
  *       required:
