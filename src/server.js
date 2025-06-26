@@ -16,7 +16,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Ethers setup
 const provider = new ethers.JsonRpcProvider(process.env.NODE_URL);
-console.log(provider, 'TESTE')
 let hManagerContract;
 let contractReady = false;
 
@@ -52,9 +51,6 @@ const setupContract = async () => {
 
 setupContract();
 
-// Remove the status endpoint completely
-// app.get('/status', (req, res) => { ... }); // DELETE THIS
-
 // Updated middleware to block ALL routes when contract not ready
 app.use((req, res, next) => {
   if (!contractReady || !hManagerContract) {
@@ -88,12 +84,9 @@ const swaggerOptions = {
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
-// Helper function to get signer (remove console.log for security)
 const getSigner = async () => {
   const privateKey = process.env.PRIVATE_KEY;
-  console.log(privateKey, 'FF', provider); // This line is for debugging purposes, remove it in production
-  // Remove this line: console.log(privateKey, 'FF')
+
   if (privateKey) {
     const wallet = new ethers.Wallet(privateKey, provider);
     return wallet;
