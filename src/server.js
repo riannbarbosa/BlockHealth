@@ -1,11 +1,19 @@
+
 const express = require('express');
 const { ethers } = require('ethers');
 const cors = require('cors');
-require('dotenv').config();
+const dotenv = require('dotenv');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
-const HManagerContract = require('../build/contracts/HManager.json'); // Adjust the path to your contract JSON
+const HManagerContract = require('../build/contracts/HManager.json');
+const path = require('path');
+const multer = require('multer');
+const uploadToIPFS = require('./ipfs/ipfs.js');
+const fs = require('fs');
+const { fileURLToPath } = require('url');
 
+
+dotenv.config();
 // Initialize express app
 const app = express();
 
@@ -14,10 +22,57 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ethers setup
 const provider = new ethers.JsonRpcProvider(process.env.NODE_URL);
 let hManagerContract;
 let contractReady = false;
+
+
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow common medical document formats
+    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images, PDFs, and document files are allowed'));
+    }
+  }
+});
+
+// Helper to schedule file deletion after 15 minutes
+const scheduleFileDeletion = (filePath, minutes = 15) => {
+  setTimeout(() => {
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error(`Error deleting file after ${minutes} minutes:`, filePath, err);
+      } else {
+        console.log(`File deleted after ${minutes} minutes:`, filePath);
+      }
+    });
+  }, minutes * 60 * 1000);
+};
 
 // Contract setup
 const setupContract = async () => {
@@ -48,6 +103,7 @@ const setupContract = async () => {
     contractReady = false;
   }
 };
+
 
 setupContract();
 
@@ -96,6 +152,7 @@ const getSigner = async () => {
   }
 };
 
+
 /**
  * @swagger
  * components:
@@ -125,6 +182,30 @@ const getSigner = async () => {
  *         doctorId:
  *           type: string
  *           description: Ethereum address of the doctor to add
+ *     AddPatientRecord:
+ *             type: object
+ *             required:
+ *               - patientName
+ *               - patientId
+ *               - diagnosis
+ *               - treatment
+ *             properties:
+ *               patientName:
+ *                 type: string
+ *                 description: Name of the patient
+ *               patientId:
+ *                 type: string
+ *                 description: Ethereum address of the patient
+ *               diagnosis:
+ *                 type: string
+ *                 description: Medical diagnosis
+ *               treatment:
+ *                 type: string
+ *                 description: Treatment plan
+ *               medicalFile:
+ *                 type: string
+ *                 format: binary
+ *                 description: Medical document file (PDF, DOC, images, etc.)
  *     PatientRecord:
  *       type: object
  *       required:
@@ -537,23 +618,40 @@ app.delete('/api/patients/:patientId', async (req, res) => {
  * @swagger
  * /api/records:
  *   post:
- *     summary: Add a new patient record
+ *     summary: Add a new patient record with file upload
  *     tags: [Records]
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/PatientRecord'
+ *             $ref: '#/components/schemas/AddPatientRecord'
  *     responses:
  *       200:
  *         description: Record added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 transactionHash:
+ *                   type: string
+ *                 cid:
+ *                   type: string
+ *                 fileName:
+ *                   type: string
+ *       400:
+ *         description: Bad request - missing required fields
  *       500:
  *         description: Server error
  */
-app.post('/api/records', async (req, res) => {
+app.post('/api/records', upload.single('medicalFile'), async (req, res) => {
   try {
-    const { cid, fileName, patientName, patientId, diagnosis, treatment } = req.body;
+    const { patientName, patientId, diagnosis, treatment } = req.body;
     const signer = await getSigner();
      if (!signer || !signer.sendTransaction) { // Check if signer is capable of sending transactions
         return res.status(400).json({
@@ -562,12 +660,27 @@ app.post('/api/records', async (req, res) => {
         });
     }
     
-    if (!cid || !fileName || !patientName || !patientId || !diagnosis || !treatment) {
+    if (!patientName || !patientId || !diagnosis || !treatment) {
       return res.status(400).json({
         success: false,
         message: 'All record fields are required'
       });
     }
+
+    let cid = '';
+    let fileName = '';
+
+    if(req.file){
+      fileName = req.file.originalname;
+      cid = await uploadToIPFS(req.file.path);
+      console.log(`File uploaded: ${fileName} -> CID: ${cid}`);
+      // Schedule deletion after 15 minutes
+      scheduleFileDeletion(req.file.path, 15);
+    }else{
+      fileName = 'no-file'
+      cid=`text-record-${Date.now()}`;
+    }
+
     const contractWithSigner = hManagerContract.connect(signer);
     
     const tx = await contractWithSigner.addPatientRecord(
