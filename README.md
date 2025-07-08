@@ -25,7 +25,7 @@ npm install
 Start the server:
 
 ```bash
-node index.js
+npm run dev
 ```
 
 The server will start on port 3000 (or the port specified in the PORT environment variable).
