@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { ethers } = require('ethers');
 const cors = require('cors');
@@ -8,7 +7,7 @@ const swaggerUi = require('swagger-ui-express');
 const HManagerContract = require('../build/contracts/HManager.json');
 const path = require('path');
 const multer = require('multer');
-const uploadToIPFS = require('./ipfs/ipfs.js');
+const { uploadToIPFS, downloadFromIPFS } = require('./ipfs/ipfs.js');
 const fs = require('fs');
 const { fileURLToPath } = require('url');
 
@@ -672,8 +671,10 @@ app.post('/api/records', upload.single('medicalFile'), async (req, res) => {
 
     if(req.file){
       fileName = req.file.originalname;
-      cid = await uploadToIPFS(req.file.path);
-      console.log(`File uploaded: ${fileName} -> CID: ${cid}`);
+      const uploadResult = await uploadToIPFS(req.file.path, patientId, true);
+      cid = uploadResult.cid;
+      console.log(`File uploaded and encrypted: ${fileName} -> CID: ${cid}`);
+      
       // Schedule deletion after 15 minutes
       scheduleFileDeletion(req.file.path, 15);
     }else{
@@ -801,6 +802,84 @@ app.get('/api/patients/:patientId/exists', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error checking patient existence',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/files/{cid}:
+ *   get:
+ *     summary: Download and decrypt a file from IPFS
+ *     tags: [Files]
+ *     parameters:
+ *       - in: path
+ *         name: cid
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: IPFS Content ID of the file
+ *       - in: query
+ *         name: patientId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Patient ID for decryption
+ *       - in: query
+ *         name: fileName
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Original filename for download
+ *     responses:
+ *       200:
+ *         description: File downloaded and decrypted successfully
+ *         content:
+ *           application/octet-stream:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Bad request - missing required parameters
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/files/:cid', async (req, res) => {
+  try {
+    const { cid } = req.params;
+    const { patientId, fileName } = req.query;
+    const signer = await getSigner();
+    
+    if (!signer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid private key required - only authorized doctors can download files'
+      });
+    }
+
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient ID is required for file decryption'
+      });
+    }
+
+    // Download and decrypt the file
+    const fileBuffer = await downloadFromIPFS(cid, patientId, true);
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'application/octet-stream');
+    if (fileName) {
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    }
+    
+    res.send(fileBuffer);
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error downloading file',
       error: error.message
     });
   }
