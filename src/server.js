@@ -152,6 +152,7 @@ const getSigner = async () => {
 };
 
 
+
 /**
  * @swagger
  * components:
@@ -161,6 +162,9 @@ const getSigner = async () => {
  *       required:
  *         - privateKey
  *       properties:
+ *         privateKey:
+ *           type: string
+ *           description: Private key of the doctor
  *     Patient:
  *       type: object
  *       required:
@@ -182,29 +186,29 @@ const getSigner = async () => {
  *           type: string
  *           description: Ethereum address of the doctor to add
  *     AddPatientRecord:
- *             type: object
- *             required:
- *               - patientName
- *               - patientId
- *               - diagnosis
- *               - treatment
- *             properties:
- *               patientName:
- *                 type: string
- *                 description: Name of the patient
- *               patientId:
- *                 type: string
- *                 description: Ethereum address of the patient
- *               diagnosis:
- *                 type: string
- *                 description: Medical diagnosis
- *               treatment:
- *                 type: string
- *                 description: Treatment plan
- *               medicalFile:
- *                 type: string
- *                 format: binary
- *                 description: Medical document file (PDF, DOC, images, etc.)
+ *       type: object
+ *       required:
+ *         - patientName
+ *         - patientId
+ *         - diagnosis
+ *         - treatment
+ *       properties:
+ *         patientName:
+ *           type: string
+ *           description: Name of the patient
+ *         patientId:
+ *           type: string
+ *           description: Ethereum address of the patient
+ *         diagnosis:
+ *           type: string
+ *           description: Medical diagnosis
+ *         treatment:
+ *           type: string
+ *           description: Treatment plan
+ *         medicalFile:
+ *           type: string
+ *           format: binary
+ *           description: Medical document file (PDF, DOC, images, etc.)
  *     PatientRecord:
  *       type: object
  *       required:
@@ -260,21 +264,16 @@ const getSigner = async () => {
 app.post('/api/doctors', async (req, res) => {
   try {
     const { doctorId } = req.body; // Expecting doctorId in the request body
-    console.log('Received doctorId:', req.body);
-    console.log('Adding doctor with ID:', doctorId);
     const signer = await getSigner();
     console.log('Signer:', signer);
-    console.log(signer.sendTransaction, 'FAF', doctorId);
 
     if (!signer || !signer.sendTransaction) {
       console.log('signer is not valid or does not support sending transactions');
-      
         return res.status(400).json({
             success: false,
             message: 'Valid private key required for this operation'
         });
     }
-    console.log('Signer is valid:', signer);
 
     if (!doctorId) {
       return res.status(400).json({
@@ -283,7 +282,6 @@ app.post('/api/doctors', async (req, res) => {
       });
     }
     const contractWithSigner = hManagerContract.connect(signer);
-    console.log('Contract with signer:', contractWithSigner);
     
     const tx = await contractWithSigner.addDoctor(doctorId);
     await tx.wait(); // Wait for the transaction to be mined
@@ -746,10 +744,20 @@ app.get('/api/records/:patientId', async (req, res) => {
     }  
     const contractWithSigner = hManagerContract.connect(signer);
     const records = await contractWithSigner.getPatientRecords(patientId);
-    
+    const formattedRecords = records.map(record => ({
+      cid: record[0],
+      fileName: record[1],
+      patientName: record[2],
+      patientId: record[3],
+      diagnosis: record[4],
+      treatment: record[5],
+      doctorId: record[6],
+      timestamp: record[7].toString(),
+    }));
+
     res.status(200).json({
       success: true,
-      records: records
+      records: formattedRecords
     });
   } catch (error) {
     console.error('Error getting patient records:', error);
