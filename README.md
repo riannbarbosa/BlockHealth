@@ -42,39 +42,61 @@ This will start a server with mock endpoints and the Swagger UI.
 
 ## Project Structure
 
-- `server.js` - Main server file with REST API endpoints and Swagger documentation
-- `index.js` - Entry point that starts the server
-- `test-server.js` - Test server with mock endpoints for testing Swagger UI
-- `HManager.sol` - Smart contract source code
-- `HManager.json` - Smart contract ABI and metadata
+
+- `src/app.js` - Main server file with REST API endpoints and Swagger documentation
+- `src/index.js` - Entry point that starts the server
+- `src/test_server.js` - Test server with mock endpoints for testing Swagger UI
+- `src/controllers/` - API controllers
+- `src/routes/` - API route definitions
+- `src/utils/` - Utility modules
+- `contracts/` - Solidity smart contracts:
+  - `AdminContract.sol` - Admin and registry logic
+  - `MedicContract.sol` - Medical records and doctor authorization
+  - `PatientContract.sol` - Patient profile and self-uploaded records
+  - `HManager.sol` - (legacy/all-in-one contract, if present)
+- `build/contracts/` - Compiled contract ABIs and metadata
+- `test/` - Truffle test files for each contract
+
 
 ## API Documentation
 
 Swagger documentation is available at:
 
-```
-http://localhost:3000/api-docs
-```
+    http://localhost:3000/api-docs
 
 ## API Endpoints
 
+
+### Admin
+
+- `POST /api/admin/doctors` - Register a new doctor
+- `DELETE /api/admin/doctors/:doctorId` - Revoke a doctor's access
+- `GET /api/admin/doctors` - List all authorized doctors
+- `POST /api/admin/patients` - Register a new patient
+- `DELETE /api/admin/patients/:patientId` - Remove (deactivate) a patient
+- `GET /api/admin/patients` - List all active patients
+
 ### Doctors
 
-- `POST /api/doctors` - Register a new doctor
-- `DELETE /api/doctors/:doctorId` - Revoke a doctor's access
 - `GET /api/doctors/:doctorId` - Check if an address is a doctor
 
 ### Patients
 
-- `POST /api/patients` - Add a new patient
-- `GET /api/patients` - Get all patients information
 - `GET /api/patients/:patientId` - Get patient information
-- `DELETE /api/patients/:patientId` - Remove a patient
 
 ### Records
 
 - `POST /api/records` - Add a new patient record
 - `GET /api/records/:patientId` - Get all records for a patient
+## Smart Contract Testing
+
+To run the smart contract tests for AdminContract, MedicContract, and PatientContract:
+
+```bash
+truffle test
+```
+
+This will run all tests in the `test/` folder and verify contract logic and integration.
 
 ## Authentication
 
@@ -130,11 +152,12 @@ curl -X POST http://localhost:3000/api/records \
 
 All endpoints return appropriate HTTP status codes and error messages in case of failure.
 
+
 ## Next Steps
 
-1. Deploy your smart contract to an Ethereum network
-2. Update the contract address in the server.js file
-3. Start the server and interact with your contract through the API
+1. Deploy your smart contracts to an Ethereum network
+2. Update the contract addresses in your server configuration (e.g., `server.js`)
+3. Start the server and interact with your contracts through the API or Swagger UI
 
 ## License
 
