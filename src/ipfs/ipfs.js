@@ -71,7 +71,9 @@ const encryptContent = (fileBuffer, encryptionKey) => {
     encryptedChunks.push(cipher.final());
     const encryptedContent = Buffer.concat(encryptedChunks);
     const authTag = cipher.getAuthTag();
-    
+    console.log(authTag);
+    console.log(cipher);
+
     const encryptedPackage = Buffer.concat([
       salt,           // 16 bytes
       iv,             // 16 bytes  
@@ -129,12 +131,12 @@ const decryptContent = (encryptedPackage, encryptionKey) => {
 
 /**
  * Generate encryption key from patient ID and timestamp
- * @param {string} patientId - Patient's Ethereum address
- * @param {string} timestamp - Optional timestamp for additional entropy
- * @returns {string} - Generated encryption key
+ * @param {string} patientId 
+ * @param {string} timestamp
+ * @returns {string}
  */
 const generateEncryptionKey = (patientId) => {
-  const secret = process.env.ENCRYPTION_SECRET || 'default-secret-change-in-production';
+  const secret = process.env.ENCRYPTION_SECRET || 'default-secret-for-test';
   return crypto.createHash('sha256')
     .update(secret + patientId)
     .digest('hex');

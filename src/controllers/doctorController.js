@@ -82,14 +82,42 @@ const checkDoctorStatus = async (req, res) => {
         const doctorInfo = await adminContract.getDoctorInfo(doctorId);
         const isAuthorized = await medicContract.isDoctorAuthorized(doctorId);
 
-        if (!doctorInfo.isAuthorized) {
+ 
+
+
+        if(doctorInfo.isAuthorized && !isAuthorized) {
+
+            try{
+                const tx = await medicContract.authorizeDoctor(doctorId);
+                await tx.wait();
+
+                const newIsAuthorized = await medicContract.isDoctorAuthorized(doctorId);
+                  return  res.status(200).json({
+            success: true,
+            message: 'Doctor status retrieved successfully',
+            data: {
+                id: doctorInfo.id,
+                name: doctorInfo.name,
+                specialization: doctorInfo.specialization,
+                licenseNumber: doctorInfo.licenseNumber,
+                isAuthorized: newIsAuthorized,
+                registrationDate: new Date(Number(doctorInfo.registrationDate) * 1000).toISOString()
+            }
+         });
+
+            }catch(error){
+                console.error('Error authorizing doctor:', error);
+            }
+        }
+
+        if (!doctorInfo.isAuthorized && !isAuthorized) {
             return res.status(404).json({
                 success: false,
                 message: 'Doctor not found or not authorized'
             });
         }
 
-        res.status(200).json({
+         res.status(200).json({
             success: true,
             message: 'Doctor status retrieved successfully',
             data: {
@@ -101,6 +129,7 @@ const checkDoctorStatus = async (req, res) => {
                 registrationDate: new Date(Number(doctorInfo.registrationDate) * 1000).toISOString()
             }
         });
+   
 
     } catch (error) {
         console.error('Error checking doctor status:', error);
@@ -154,21 +183,21 @@ const getPatients = async (req, res) => {
  */
 const addPatientRecord = async (req, res) => {
     try {
-        const { patientId, diagnosis, treatment, doctorId } = req.body;
+        const { patientId, diagnosis, treatment } = req.body;
         const medicalFile = req.file;
 
         // Validate required fields
-        if (!patientId || !diagnosis || !treatment || !doctorId) {
+        if (!patientId || !diagnosis || !treatment) {
             return res.status(400).json({
                 success: false,
-                message: 'All fields are required: patientId, diagnosis, treatment, doctorId'
+                message: 'All fields are required: patientId, diagnosis, treatment'
             });
         }
 
-        if (!ethers.isAddress(patientId) || !ethers.isAddress(doctorId)) {
+        if (!ethers.isAddress(patientId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid Ethereum addresses'
+                message: 'Invalid Ethereum address for patientId'
             });
         }
 
@@ -178,9 +207,8 @@ const addPatientRecord = async (req, res) => {
                 message: 'Contracts not initialized'
             });
         }
-
-        // Verify doctor is authorized
-        const isDoctorAuthorized = await medicContract.isDoctorAuthorized(doctorId);
+        const signerAddress = await medicContract.runner.getAddress();
+        const isDoctorAuthorized = await medicContract.isDoctorAuthorized(signerAddress);
         if (!isDoctorAuthorized) {
             return res.status(403).json({
                 success: false,
@@ -189,6 +217,7 @@ const addPatientRecord = async (req, res) => {
         }
 
         const isPatientActive = await adminContract.isPatientActive(patientId);
+                console.log('Is patient active?', isPatientActive);
         if (!isPatientActive) {
             return res.status(404).json({
                 success: false,
@@ -196,9 +225,9 @@ const addPatientRecord = async (req, res) => {
             });
         }
 
+      
         let cid = '';
         let fileName = '';
-
         if (medicalFile) {
             try {
                 const ipfsResult = await uploadToIPFS(medicalFile.path, patientId, true);
@@ -222,8 +251,7 @@ const addPatientRecord = async (req, res) => {
             fileName,
             patientId,
             diagnosis,
-            treatment,
-            { from: doctorId }
+            treatment
         );
 
         const receipt = await tx.wait();
@@ -237,7 +265,7 @@ const addPatientRecord = async (req, res) => {
                 patientId,
                 diagnosis,
                 treatment,
-                doctorId,
+                doctorId: signerAddress,
                 transactionHash: receipt.hash,
                 blockNumber: receipt.blockNumber
             }
@@ -410,8 +438,8 @@ const deactivateRecord = async (req, res) => {
             });
         }
 
-        // Deactivate the record
-        const tx = await medicContract.deactivateRecord(patientId, recordIndex, { from: doctorId });
+        // Deactivate the recorde
+        const tx = await medicContract.deactivateRecord(patientId, recordIndex, doctorId);
         const receipt = await tx.wait();
 
         res.status(200).json({

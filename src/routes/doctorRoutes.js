@@ -129,7 +129,6 @@ const {
  *             type: object
  *             required:
  *               - patientId
- *               - doctorId
  *               - diagnosis
  *               - treatment
  *               - medicalFile
@@ -138,10 +137,6 @@ const {
  *                 type: string
  *                 description: The Ethereum address of the patient
  *                 example: "0x8ba1f109551bD432803012645Hac136c"
- *               doctorId:
- *                 type: string
- *                 description: The Ethereum address of the doctor
- *                 example: "0x742d35Cc8C4F8c7dd0f1e8a0b7B8e5F9E8A0F8C7"
  *               diagnosis:
  *                 type: string
  *                 description: Medical diagnosis
@@ -181,8 +176,6 @@ const {
  *                     diagnosis:
  *                       type: string
  *                     treatment:
- *                       type: string
- *                     doctorId:
  *                       type: string
  *                     transactionHash:
  *                       type: string

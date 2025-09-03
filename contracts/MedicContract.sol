@@ -40,7 +40,7 @@ contract MedicContract {
         require(msg.sender == adminContract || msg.sender == owner, "Only admin can perform this action");
         _;
     }
-      modifier onlyAuthorizedDoctor() {
+    modifier onlyAuthorizedDoctor() {
         require(
             authorizedDoctors[msg.sender],
             "Not an authorized medical provider"
@@ -54,11 +54,19 @@ contract MedicContract {
     }
 
     function _isPatientActive(address patientId) private view returns (bool) {
-         if(adminContract == address(0)) return false;
+        if (adminContract == address(0)) {
+            revert("Admin contract address is not set");
+        }
+
         (bool success, bytes memory data) = adminContract.staticcall(
             abi.encodeWithSignature("isPatientActive(address)", patientId)
         );
-        return success && abi.decode(data, (bool));
+
+        if (!success) {
+            revert("Failed to call isPatientActive on AdminContract");
+        }
+
+        return abi.decode(data, (bool));
     }
 
     function setAdminContract(address _adminContract) public onlyOwner {
@@ -100,12 +108,12 @@ contract MedicContract {
         emit RecordAdded(_cid, _patientId, msg.sender);
     }
 
-   function deactivateRecord(address _patientId, uint256 _recordIndex) public onlyAuthorizedDoctor {
+   function deactivateRecord(address _patientId, uint256 _recordIndex) public onlyAuthorizedDoctor patientActive(_patientId) {
        require(_recordIndex < patientRecords[_patientId].length, "Invalid record index");
-        require(
-            patientRecords[_patientId][_recordIndex].doctorId == msg.sender,
-            "Only record creator can deactivate"
-        );
+       require(
+           patientRecords[_patientId][_recordIndex].doctorId == msg.sender,
+           "Only record creator can deactivate"
+       );
        patientRecords[_patientId][_recordIndex].isActive = false;
        emit RecordDeactivated(_patientId, _recordIndex);
    }

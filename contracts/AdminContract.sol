@@ -86,16 +86,15 @@ contract AdminContract {
     }
 
     function revokeDoctor(address _doctorId) public onlyOwner doctorExists(_doctorId) {
-        doctors[_doctorId].isAuthorized = false;
-        
         // Call the main contract to revoke doctor
         if (medicContract != address(0)) {
-             require(doctors[_doctorId].isAuthorized == false, "Revoke failed");
             (bool success, ) = medicContract.call(
                 abi.encodeWithSignature("revokeDoctor(address)", _doctorId)
             );
             require(success, "Failed to revoke doctor in medic contract");
         }
+
+        doctors[_doctorId].isAuthorized = false;
         
         emit DoctorRevoked(_doctorId);
     }

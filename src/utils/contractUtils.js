@@ -20,7 +20,7 @@ const setupContract = async (app) => {
     try {
         console.log('Setting up blockchain contracts...');
 
-        const rpcUrl = process.env.RPC_URL || 'http://localhost:8545'; // Ganache default
+        const rpcUrl = process.env.RPC_URL || 'http://localhost:7545'; // Ganache default
         provider = new ethers.JsonRpcProvider(rpcUrl);
 
         const privateKey = process.env.PRIVATE_KEY;
