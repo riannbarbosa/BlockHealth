@@ -32,7 +32,7 @@
     "mocha": "^10.2.0",
     "multer": "^2.0.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui": "^5.22.0",
+    "swagger-ui": "^3.23.3",
     "swagger-ui-dist": "^5.22.0",
     "swagger-ui-express": "^5.0.1"
   },
