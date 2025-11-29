@@ -5,7 +5,7 @@ const {
     addDoctor,
     revokeDoctor,
     addPatient,
-    removePatient,
+    deactivatePatient,
     getAllPatients,
     getAllDoctors
 } = require('../controllers/adminController');
@@ -514,7 +514,7 @@ const {
 router.post('/doctors', addDoctor);
 router.delete('/doctors/:doctorId', revokeDoctor);
 router.post('/patients', addPatient);
-router.delete('/patients/:patientId', removePatient);
+router.delete('/patients/:patientId', deactivatePatient);
 router.get('/patients', getAllPatients);
 router.get('/doctors', getAllDoctors);
 

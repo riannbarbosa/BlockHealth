@@ -219,7 +219,7 @@ const addPatient = async (req, res) => {
 /**
  * Remove (deactivate) a patient from the system
  */
-const removePatient = async (req, res) => {
+const deactivatePatient = async (req, res) => {
     try {
         const { patientId } = req.params;
 
@@ -358,7 +358,7 @@ module.exports = {
     addDoctor,
     revokeDoctor,
     addPatient,
-    removePatient,
+    deactivatePatient,
     getAllDoctors,
     getAllPatients
 };
