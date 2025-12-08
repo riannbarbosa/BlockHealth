@@ -183,21 +183,20 @@ const getPatients = async (req, res) => {
  */
 const addPatientRecord = async (req, res) => {
     try {
-        const { patientId, diagnosis, treatment } = req.body;
+        const { patientId, diagnosis, treatment, doctorId } = req.body;
         const medicalFile = req.file;
 
-        // Validate required fields
-        if (!patientId || !diagnosis || !treatment) {
+        if (!patientId || !diagnosis || !treatment || !doctorId) {
             return res.status(400).json({
                 success: false,
-                message: 'All fields are required: patientId, diagnosis, treatment'
+                message: 'All fields are required: patientId, diagnosis, treatment, doctorId'
             });
         }
 
-        if (!ethers.isAddress(patientId)) {
+        if (!ethers.isAddress(patientId) || !ethers.isAddress(doctorId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid Ethereum address for patientId'
+                message: 'Invalid Ethereum address for patientId or doctorId'
             });
         }
 
@@ -207,17 +206,35 @@ const addPatientRecord = async (req, res) => {
                 message: 'Contracts not initialized'
             });
         }
-        const signerAddress = await medicContract.runner.getAddress();
-        const isDoctorAuthorized = await medicContract.isDoctorAuthorized(signerAddress);
+
+        // Verify doctor is authorized
+        const isDoctorAuthorized = await medicContract.isDoctorAuthorized(doctorId);
         if (!isDoctorAuthorized) {
-            return res.status(403).json({
-                success: false,
-                message: 'Doctor is not authorized'
-            });
+            // Try to sync from AdminContract
+            const doctorInfo = await adminContract.getDoctorInfo(doctorId);
+            if (doctorInfo.isAuthorized) {
+                console.log('Syncing doctor authorization...');
+                try {
+                    const authTx = await medicContract.authorizeDoctor(doctorId);
+                    await authTx.wait();
+                    console.log('Doctor authorization synced successfully');
+                } catch (authError) {
+                    console.error('Failed to sync doctor authorization:', authError);
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Doctor is not properly authorized in the system'
+                    });
+                }
+            } else {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Doctor is not authorized'
+                });
+            }
         }
 
+        // Verify patient is active
         const isPatientActive = await adminContract.isPatientActive(patientId);
-                console.log('Is patient active?', isPatientActive);
         if (!isPatientActive) {
             return res.status(404).json({
                 success: false,
@@ -225,7 +242,6 @@ const addPatientRecord = async (req, res) => {
             });
         }
 
-      
         let cid = '';
         let fileName = '';
         if (medicalFile) {
@@ -233,11 +249,10 @@ const addPatientRecord = async (req, res) => {
                 const ipfsResult = await uploadToIPFS(medicalFile.path, patientId, true);
                 cid = ipfsResult.cid;
                 fileName = medicalFile.originalname;
-
                 fs.unlinkSync(medicalFile.path);
             } catch (ipfsError) {
                 console.error('IPFS upload error:', ipfsError);
-                cid = 'QmNoPhuLRhyaJzx1KoJ6vgmwmvFTxc8a1Cv7Bx1RPb6cNq'; // Placeholder
+                cid = 'QmNoPhuLRhyaJzx1KoJ6vgmwmvFTxc8a1Cv7Bx1RPb6cNq';
                 fileName = medicalFile ? medicalFile.originalname : 'No file';
             }
         } else {
@@ -245,13 +260,14 @@ const addPatientRecord = async (req, res) => {
             fileName = 'Text record only';
         }
 
-        // Add medical record to blockchain
-        const tx = await medicContract.addMedicalRecord(
+        // Use the new addMedicalRecordByAdmin function
+        const tx = await medicContract.addMedicalRecordByAdmin(
             cid,
             fileName,
             patientId,
             diagnosis,
-            treatment
+            treatment,
+            doctorId
         );
 
         const receipt = await tx.wait();
@@ -265,7 +281,7 @@ const addPatientRecord = async (req, res) => {
                 patientId,
                 diagnosis,
                 treatment,
-                doctorId: signerAddress,
+                doctorId: doctorId,
                 transactionHash: receipt.hash,
                 blockNumber: receipt.blockNumber
             }
@@ -274,13 +290,12 @@ const addPatientRecord = async (req, res) => {
     } catch (error) {
         console.error('Error adding patient record:', error);
         
-        // Clean up uploaded file if it exists
         if (req.file && req.file.path && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
 
         let errorMessage = 'Failed to add medical record';
-        if (error.message.includes('Not an authorized medical provider')) {
+        if (error.message.includes('Specified doctor is not authorized')) {
             errorMessage = 'Doctor is not authorized to add records';
         } else if (error.message.includes('Patient not active')) {
             errorMessage = 'Patient is not active in the system';

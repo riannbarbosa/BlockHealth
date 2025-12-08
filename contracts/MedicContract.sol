@@ -86,6 +86,32 @@ contract MedicContract {
     function revokeDoctor(address _doctorId) public onlyAdmin {
         authorizedDoctors[_doctorId] = false;
     }
+
+       function addMedicalRecordByAdmin(
+        string memory _cid,
+        string memory _fileName,
+        address _patientId,
+        string memory _diagnosis,
+        string memory _treatment,
+        address _doctorId
+    ) public onlyAdmin patientActive(_patientId) {
+        require(authorizedDoctors[_doctorId], "Specified doctor is not authorized");
+        
+        patientRecords[_patientId].push(
+            MedicalRecord({
+                cid: _cid,
+                fileName: _fileName,
+                patientId: _patientId,
+                diagnosis: _diagnosis,
+                treatment: _treatment,
+                doctorId: _doctorId,
+                timestamp: block.timestamp,
+                isActive: true
+            })
+        );
+        emit RecordAdded(_cid, _patientId, _doctorId);
+    }
+    
     function addMedicalRecord(
         string memory _cid,
         string memory _fileName,

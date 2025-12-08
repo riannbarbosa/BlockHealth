@@ -34,34 +34,6 @@ const {
  *     responses:
  *       200:
  *         description: Doctor status retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Doctor status retrieved successfully"
- *                 data:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     name:
- *                       type: string
- *                       example: "Dr. John Smith"
- *                     specialization:
- *                       type: string
- *                       example: "Cardiology"
- *                     licenseNumber:
- *                       type: string
- *                       example: "MD123456789"
- *                     isAuthorized:
- *                       type: boolean
- *                       example: true
  *       400:
  *         description: Invalid Ethereum address
  *       404:
@@ -80,36 +52,6 @@ const {
  *     responses:
  *       200:
  *         description: Patients retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Patients retrieved successfully"
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                       name:
- *                         type: string
- *                         example: "Jane Doe"
- *                       dateOfBirth:
- *                         type: string
- *                         example: "1990-05-15"
- *                       phoneNumber:
- *                         type: string
- *                         example: "+1234567890"
- *                       isActive:
- *                         type: boolean
- *                         example: true
  *       500:
  *         description: Internal server error
  */
@@ -131,7 +73,7 @@ const {
  *               - patientId
  *               - diagnosis
  *               - treatment
- *               - medicalFile
+ *               - doctorId
  *             properties:
  *               patientId:
  *                 type: string
@@ -145,10 +87,14 @@ const {
  *                 type: string
  *                 description: Treatment prescribed
  *                 example: "ACE inhibitor medication"
+ *               doctorId:
+ *                 type: string
+ *                 description: The Ethereum address of the doctor adding the record
+ *                 example: "0x742d35Cc8C4F8c7dd0f1e8a0b7B8e5F9E8A0F8C7"
  *               medicalFile:
  *                 type: string
  *                 format: binary
- *                 description: Medical file to upload (PDF, images, documents)
+ *                 description: Medical file to upload (PDF, images, documents) - OPTIONAL
  *     responses:
  *       201:
  *         description: Medical record added successfully
@@ -177,12 +123,18 @@ const {
  *                       type: string
  *                     treatment:
  *                       type: string
+ *                     doctorId:
+ *                       type: string
  *                     transactionHash:
  *                       type: string
  *                     blockNumber:
  *                       type: number
  *       400:
  *         description: Bad request - Invalid input or missing required fields
+ *       403:
+ *         description: Doctor is not authorized
+ *       404:
+ *         description: Patient not found or not active
  *       500:
  *         description: Internal server error
  */
@@ -202,39 +154,17 @@ const {
  *           type: string
  *         description: The Ethereum address of the patient
  *         example: "0x8ba1f109551bD432803012645Hac136c"
+ *       - in: query
+ *         name: activeOnly
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Filter to show only active records
+ *         example: "true"
  *     responses:
  *       200:
  *         description: Medical records retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Medical records retrieved successfully"
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       cid:
- *                         type: string
- *                       fileName:
- *                         type: string
- *                       diagnosis:
- *                         type: string
- *                       treatment:
- *                         type: string
- *                       doctorId:
- *                         type: string
- *                       timestamp:
- *                         type: number
- *                       isActive:
- *                         type: boolean
  *       400:
  *         description: Invalid Ethereum address
  *       404:
@@ -261,28 +191,6 @@ const {
  *     responses:
  *       200:
  *         description: Patient existence status retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Patient exists and is active"
- *                 data:
- *                   type: object
- *                   properties:
- *                     exists:
- *                       type: boolean
- *                       example: true
- *                     isActive:
- *                       type: boolean
- *                       example: true
- *                     patientId:
- *                       type: string
  *       400:
  *         description: Invalid Ethereum address
  *       404:
@@ -298,4 +206,3 @@ router.get('/records/:patientId', getPatientRecords);
 router.get('/patients/:patientId/exists', checkPatientExists);
 
 module.exports = router;
-
