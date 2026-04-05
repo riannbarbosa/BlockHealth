@@ -1,11 +1,12 @@
-const { ethers } = require('ethers')
-const fs = require('fs')
-const path = require('path')
+const { ethers } = require('ethers');
+const fs = require('fs');
+const path = require('path');
 
 // Import controllers to initialize contracts
-const adminController = require('../controllers/adminController')
-const doctorController = require('../controllers/doctorController')
-const patientController = require('../controllers/patientController')
+const adminController = require('../controllers/adminController');
+const doctorController = require('../controllers/doctorController');
+const patientController = require('../controllers/patientController');
+const fileRoutes = require('../routes/fileRoutes') ;
 
 let provider
 let signer
@@ -87,9 +88,10 @@ const setupContract = async app => {
       patientContract,
     }
 
-    adminController.initializeContracts(contracts)
-    doctorController.initializeContracts(contracts)
-    patientController.initializeContracts(contracts)
+    adminController.initializeContracts(contracts);
+    doctorController.initializeContracts(contracts);
+    patientController.initializeContracts(contracts);
+    fileRoutes.initializeContracts(contracts);
 
     // Add contract information to app for debugging
     app.locals.contracts = {

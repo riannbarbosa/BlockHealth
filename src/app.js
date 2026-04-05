@@ -9,8 +9,6 @@ const adminRoutes = require('./routes/adminRoutes')
 const doctorRoutes = require('./routes/doctorRoutes')
 const patientRoutes = require('./routes/patientRoutes')
 const fileRoutes = require('./routes/fileRoutes')
-fileRoutes.initializeContracts({ adminContract, medicContract })
-
 dotenv.config()
 const app = express()
 
