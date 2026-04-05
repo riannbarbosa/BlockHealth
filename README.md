@@ -47,12 +47,14 @@ npm install -g truffle
 ### 4. Configure Ganache
 
 **Option A: Ganache GUI**
+
 - Download and install [Ganache](https://trufflesuite.com/ganache/)
 - Open Ganache and create a new workspace
 - Ensure it's running on port **7545** (default)
 - Note the network ID (should be **5777** or use any network)
 
 **Option B: Ganache CLI**
+
 ```bash
 npm install -g ganache-cli
 ganache-cli -p 8545
@@ -73,6 +75,7 @@ truffle migrate --reset --network development
 ```
 
 You should see output showing the deployed contract addresses:
+
 ```
 MedicContract deployed at: 0x...
 AdminContract deployed at: 0x...
@@ -177,47 +180,46 @@ BlockHealth/
 └── README.md                           # Project documentation
 ```
 
-
 ## 📚 API Documentation
 
 ### Admin Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/doctors` | Register a new doctor |
-| DELETE | `/api/admin/doctors/:doctorId` | Revoke doctor authorization |
-| GET | `/api/admin/doctors` | Get all authorized doctors |
-| POST | `/api/admin/patients` | Register a new patient |
-| DELETE | `/api/admin/patients/:patientId` | Deactivate a patient |
-| GET | `/api/admin/patients` | Get all active patients |
+| Method | Endpoint                         | Description                 |
+| ------ | -------------------------------- | --------------------------- |
+| POST   | `/api/admin/doctors`             | Register a new doctor       |
+| DELETE | `/api/admin/doctors/:doctorId`   | Revoke doctor authorization |
+| GET    | `/api/admin/doctors`             | Get all authorized doctors  |
+| POST   | `/api/admin/patients`            | Register a new patient      |
+| DELETE | `/api/admin/patients/:patientId` | Deactivate a patient        |
+| GET    | `/api/admin/patients`            | Get all active patients     |
 
 ### Doctor Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/doctor/doctors/:doctorId` | Check doctor authorization status |
-| GET | `/api/doctor/patients` | Get all patients |
-| POST | `/api/doctor/records` | Add a patient medical record (with file upload) |
-| GET | `/api/doctor/records/:patientId` | Get patient medical records |
-| GET | `/api/doctor/patients/:patientId/exists` | Check if patient exists |
+| Method | Endpoint                                 | Description                                     |
+| ------ | ---------------------------------------- | ----------------------------------------------- |
+| GET    | `/api/doctor/doctors/:doctorId`          | Check doctor authorization status               |
+| GET    | `/api/doctor/patients`                   | Get all patients                                |
+| POST   | `/api/doctor/records`                    | Add a patient medical record (with file upload) |
+| GET    | `/api/doctor/records/:patientId`         | Get patient medical records                     |
+| GET    | `/api/doctor/patients/:patientId/exists` | Check if patient exists                         |
 
 ### Patient Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/patient/register` | Patient self-registration |
-| GET | `/api/patient/:patientId` | Get patient information |
-| GET | `/api/patient/:patientId/medical-records` | Get medical records from doctors |
-| GET | `/api/patient/:patientId/records` | Get self-uploaded records |
-| GET | `/api/patient/:patientId/profile` | Get patient profile |
-| POST | `/api/patient/upload-record` | Upload a self-record |
+| Method | Endpoint                                  | Description                      |
+| ------ | ----------------------------------------- | -------------------------------- |
+| POST   | `/api/patient/register`                   | Patient self-registration        |
+| GET    | `/api/patient/:patientId`                 | Get patient information          |
+| GET    | `/api/patient/:patientId/medical-records` | Get medical records from doctors |
+| GET    | `/api/patient/:patientId/records`         | Get self-uploaded records        |
+| GET    | `/api/patient/:patientId/profile`         | Get patient profile              |
+| POST   | `/api/patient/upload-record`              | Upload a self-record             |
 
 ### File Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/files/upload` | Upload a file to IPFS |
-| GET | `/api/files/download/:cid` | Download a file from IPFS |
+| Method | Endpoint                   | Description               |
+| ------ | -------------------------- | ------------------------- |
+| POST   | `/api/files/upload`        | Upload a file to IPFS     |
+| GET    | `/api/files/download/:cid` | Download a file from IPFS |
 
 ## 🧪 Testing
 
@@ -242,6 +244,7 @@ truffle console --network development
 ```
 
 Inside the console:
+
 ```javascript
 // Get contract instance
 let admin = await AdminContract.deployed()
@@ -252,7 +255,7 @@ let patient = await PatientContract.deployed()
 let accounts = await web3.eth.getAccounts()
 
 // Test adding a doctor
-await admin.addDoctor(accounts[1], "Dr. John", "Cardiology", "MD12345")
+await admin.addDoctor(accounts[1], 'Dr. John', 'Cardiology', 'MD12345')
 ```
 
 ## 📝 Example Usage
@@ -336,11 +339,13 @@ curl -X GET "http://localhost:3000/api/patient/0x8ba1f109551bD432803012645Hac136
 ### Contract Deployment Issues
 
 **Problem**: Migration fails with "network not running"
+
 ```
 Error: No network specified. Cannot determine current network.
 ```
 
 **Solution**: Ensure Ganache is running and check your `truffle-config.js`:
+
 ```bash
 # Check if Ganache is running
 curl http://127.0.0.1:7545
@@ -352,11 +357,13 @@ truffle migrate --reset --network development
 ### Connection Issues
 
 **Problem**: API cannot connect to blockchain
+
 ```
 Error: Provider not set or invalid
 ```
 
-**Solution**: 
+**Solution**:
+
 1. Verify Ganache is running
 2. Check contract addresses in your configuration
 3. Ensure `.env` file has correct values
@@ -364,11 +371,13 @@ Error: Provider not set or invalid
 ### IPFS Issues
 
 **Problem**: File upload fails
+
 ```
 Error: IPFS daemon not running
 ```
 
-**Solution**: 
+**Solution**:
+
 1. Install IPFS Desktop or run IPFS daemon
 2. Or use a public IPFS gateway
 3. Update IPFS configuration in code
@@ -385,16 +394,19 @@ Error: IPFS daemon not running
 ## 📄 Smart Contract Architecture
 
 ### AdminContract
+
 - Manages doctor and patient registration
 - Handles authorization and deactivation
 - Maintains registry of all participants
 
 ### MedicContract
+
 - Stores medical records from doctors
 - Validates doctor authorization
 - Links to AdminContract for access control
 
 ### PatientContract
+
 - Manages patient self-uploaded records
 - Stores patient profile information
 - Links to both MedicContract and AdminContract

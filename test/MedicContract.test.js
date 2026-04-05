@@ -1,236 +1,270 @@
-const MedicContract = artifacts.require("MedicContract");
-const AdminContract = artifacts.require("AdminContract");
+const MedicContract = artifacts.require('MedicContract')
+const AdminContract = artifacts.require('AdminContract')
 
-contract("MedicContract", (accounts) => {
-  let medicInstance;
-  let adminInstance;
-  const owner = accounts[0];
-  const doctor1 = accounts[1];
-  const doctor2 = accounts[2];
-  const patient1 = accounts[3];
-  const unauthorized = accounts[4];
+contract('MedicContract', accounts => {
+  let medicInstance
+  let adminInstance
+  const owner = accounts[0]
+  const doctor1 = accounts[1]
+  const doctor2 = accounts[2]
+  const patient1 = accounts[3]
+  const unauthorized = accounts[4]
 
   beforeEach(async () => {
-    // Deploy fresh instances for each test
-    medicInstance = await MedicContract.new({ from: owner });
-    adminInstance = await AdminContract.new({ from: owner });
-    
-    await medicInstance.setAdminContract(adminInstance.address, { from: owner });
-    await adminInstance.updateMedicContract(medicInstance.address, { from: owner });
-    
-    await adminInstance.registerPatient(
-      patient1, 
-      "Alice Johnson", 
-      "1990-01-01", 
-      "1234567890", 
-      "Bob Johnson", 
-      { from: owner }
-    );
-    
-    // Register and authorize doctor1
-    await adminInstance.registerDoctor(
-      doctor1, 
-      "Dr. Smith", 
-      "Cardiology", 
-      "LIC001", 
-      { from: owner }
-    );
-  });
+    medicInstance = await MedicContract.new({ from: owner })
+    adminInstance = await AdminContract.new({ from: owner })
 
-  describe("Deployment", () => {
-    it("should deploy the MedicContract successfully", async () => {
-      assert.ok(medicInstance.address, "Contract address should not be empty");
-      assert.notEqual(medicInstance.address, "0x0000000000000000000000000000000000000000", "Contract address should be valid");
-    });
+    await medicInstance.setAdminContract(adminInstance.address, { from: owner })
+    await adminInstance.updateMedicContract(medicInstance.address, { from: owner })
 
-    it("should set the deployer as owner", async () => {
-      const contractOwner = await medicInstance.owner();
-      assert.equal(contractOwner, owner, "Deployer should be the owner");
-    });
-  });
+    await adminInstance.registerPatient(patient1, 'Alice Johnson', '1990-01-01', '1234567890', 'Bob Johnson', {
+      from: owner,
+    })
 
-  describe("Admin Contract Integration", () => {
-    it("should set the admin contract address", async () => {
-      const newMedicInstance = await MedicContract.new({ from: owner });
-      await newMedicInstance.setAdminContract(adminInstance.address, { from: owner });
-      
-      const adminAddr = await newMedicInstance.adminContract();
-      assert.equal(adminAddr, adminInstance.address, "Admin contract address should be set");
-    });
+    await adminInstance.registerDoctor(doctor1, 'Dr. Smith', 'Cardiology', 'LIC001', { from: owner })
+  })
 
-    it("should not allow non-owner to set admin contract", async () => {
-      const newMedicInstance = await MedicContract.new({ from: owner });
-      
+  describe('Deployment', () => {
+    it('should deploy the MedicContract successfully', async () => {
+      assert.ok(medicInstance.address, 'Contract address should not be empty')
+      assert.notEqual(
+        medicInstance.address,
+        '0x0000000000000000000000000000000000000000',
+        'Contract address should be valid'
+      )
+    })
+
+    it('should set the deployer as owner', async () => {
+      const contractOwner = await medicInstance.owner()
+      assert.equal(contractOwner, owner, 'Deployer should be the owner')
+    })
+  })
+
+  describe('Admin Contract Integration', () => {
+    it('should set the admin contract address', async () => {
+      const newMedicInstance = await MedicContract.new({ from: owner })
+      await newMedicInstance.setAdminContract(adminInstance.address, { from: owner })
+
+      const adminAddr = await newMedicInstance.adminContract()
+      assert.equal(adminAddr, adminInstance.address, 'Admin contract address should be set')
+    })
+
+    it('should not allow non-owner to set admin contract', async () => {
+      const newMedicInstance = await MedicContract.new({ from: owner })
+
       try {
-        await newMedicInstance.setAdminContract(adminInstance.address, { from: unauthorized });
-        assert.fail("Should have thrown an error");
+        await newMedicInstance.setAdminContract(adminInstance.address, { from: unauthorized })
+        assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.include(error.message, "revert", "Should revert the transaction");
+        assert.include(error.message, 'revert', 'Should revert the transaction')
       }
-    });
-  });
+    })
+  })
 
-  describe("Doctor Authorization", () => {
-    it("should check if a doctor is authorized", async () => {
-      const isAuth = await medicInstance.isDoctorAuthorized(doctor1);
-      assert.isTrue(isAuth, "Doctor should be authorized through AdminContract");
-    });
+  describe('Doctor Authorization', () => {
+    it('should check if a doctor is authorized', async () => {
+      const isAuth = await medicInstance.isDoctorAuthorized(doctor1)
+      assert.isTrue(isAuth, 'Doctor should be authorized through AdminContract')
+    })
 
-    it("should return false for unauthorized doctor", async () => {
-      const isAuth = await medicInstance.isDoctorAuthorized(unauthorized);
-      assert.isFalse(isAuth, "Unauthorized address should not be authorized");
-    });
+    it('should return false for unauthorized doctor', async () => {
+      const isAuth = await medicInstance.isDoctorAuthorized(unauthorized)
+      assert.isFalse(isAuth, 'Unauthorized address should not be authorized')
+    })
 
-    it("should return false for revoked doctor", async () => {
-      // Revoke doctor in AdminContract
-      await adminInstance.revokeDoctor(doctor1, { from: owner });
-      
-      const isAuth = await medicInstance.isDoctorAuthorized(doctor1);
-      assert.isFalse(isAuth, "Revoked doctor should not be authorized");
-    });
-  });
+    it('should return false for revoked doctor', async () => {
+      await adminInstance.revokeDoctor(doctor1, { from: owner })
 
-  describe("Medical Records", () => {
-    it("should add a medical record by authorized doctor", async () => {
-      const tx = await medicInstance.addMedicalRecord(
-        "QmTest123CID", 
-        "medical_report.pdf", 
-        patient1, 
-        "Hypertension", 
-        "ACE inhibitor medication", 
-        { from: doctor1 }
-      );
+      const isAuth = await medicInstance.isDoctorAuthorized(doctor1)
+      assert.isFalse(isAuth, 'Revoked doctor should not be authorized')
+    })
+  })
 
-      // Check event
-      assert.equal(tx.logs[0].event, "RecordAdded", "Should emit RecordAdded event");
-      assert.equal(tx.logs[0].args.patientId, patient1, "Event should contain patient ID");
-      assert.equal(tx.logs[0].args.doctorId, doctor1, "Event should contain doctor ID");
+  describe('Medical Records', () => {
+    it('should add a medical record by authorized doctor', async () => {
+      const tx = await medicInstance.addMedicalRecordByAdmin(
+        'QmCID1',
+        'report.pdf',
+        patient1,
+        'Diagnosis',
+        'Treatment',
+        doctor1,
+        { from: owner }
+      )
 
-      // Retrieve records
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      assert.isArray(records, "Records should be an array");
-      assert.equal(records.length, 1, "Should have one record");
-      assert.equal(records[0].cid, "QmTest123CID", "CID should match");
-      assert.equal(records[0].fileName, "medical_report.pdf", "File name should match");
-      assert.equal(records[0].diagnosis, "Hypertension", "Diagnosis should match");
-      assert.equal(records[0].treatment, "ACE inhibitor medication", "Treatment should match");
-      assert.equal(records[0].doctorId, doctor1, "Doctor ID should match");
-      assert.isTrue(records[0].isActive, "Record should be active");
-    });
+      assert.equal(tx.logs[0].event, 'RecordAdded', 'Should emit RecordAdded event')
+      assert.equal(tx.logs[0].args.patientId, patient1, 'Event should contain patient ID')
+      assert.equal(tx.logs[0].args.doctorId, doctor1, 'Event should contain doctor ID')
 
-    it("should not allow unauthorized person to add medical records", async () => {
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      assert.isArray(records, 'Records should be an array')
+      assert.equal(records.length, 1, 'Should have one record')
+      assert.equal(records[0].cid, 'QmCID1', 'CID should match')
+      assert.equal(records[0].fileName, 'report.pdf', 'File name should match')
+      assert.equal(records[0].diagnosis, 'Diagnosis', 'Diagnosis should match')
+      assert.equal(records[0].treatment, 'Treatment', 'Treatment should match')
+      assert.equal(records[0].doctorId, doctor1, 'Doctor ID should match')
+      assert.isTrue(records[0].isActive, 'Record should be active')
+    })
+
+    it('should not allow unauthorized person to add medical records', async () => {
       try {
-        await medicInstance.addMedicalRecord(
-          "QmTest123CID", 
-          "report.pdf", 
-          patient1, 
-          "Diagnosis", 
-          "Treatment", 
+        await medicInstance.addMedicalRecordByAdmin(
+          'QmCID1',
+          'report.pdf',
+          patient1,
+          'Diagnosis',
+          'Treatment',
+          doctor1,
           { from: unauthorized }
-        );
-        assert.fail("Should have thrown an error");
+        )
+        assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.include(error.message, "revert", "Should revert for unauthorized doctor");
+        assert.include(error.message, 'revert', 'Should revert for unauthorized caller')
       }
-    });
+    })
 
-    it("should not allow adding records for inactive patient", async () => {
-      // Deactivate patient
-      await adminInstance.deactivatePatient(patient1, { from: owner });
+    it('should not allow adding records for inactive patient', async () => {
+      await adminInstance.deactivatePatient(patient1, { from: owner })
 
       try {
-        await medicInstance.addMedicalRecord(
-          "QmTest123CID", 
-          "report.pdf", 
-          patient1, 
-          "Diagnosis", 
-          "Treatment", 
-          { from: doctor1 }
-        );
-        assert.fail("Should have thrown an error");
+        await medicInstance.addMedicalRecordByAdmin(
+          'QmCID1',
+          'report.pdf',
+          patient1,
+          'Diagnosis',
+          'Treatment',
+          doctor1,
+          { from: owner }
+        )
+        assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.include(error.message, "revert", "Should revert for inactive patient");
+        assert.include(error.message, 'revert', 'Should revert for inactive patient')
       }
-    });
+    })
 
-    it("should add multiple medical records", async () => {
-      // Add first record
-      await medicInstance.addMedicalRecord(
-        "QmCID1", 
-        "report1.pdf", 
-        patient1, 
-        "Diagnosis 1", 
-        "Treatment 1", 
-        { from: doctor1 }
-      );
+    it('should add multiple medical records', async () => {
+      await medicInstance.addMedicalRecordByAdmin(
+        'QmCID1',
+        'report1.pdf',
+        patient1,
+        'Diagnosis 1',
+        'Treatment 1',
+        doctor1,
+        { from: owner }
+      )
 
-      // Add second record
-      await medicInstance.addMedicalRecord(
-        "QmCID2", 
-        "report2.pdf", 
-        patient1, 
-        "Diagnosis 2", 
-        "Treatment 2", 
-        { from: doctor1 }
-      );
+      await medicInstance.addMedicalRecordByAdmin(
+        'QmCID2',
+        'report2.pdf',
+        patient1,
+        'Diagnosis 2',
+        'Treatment 2',
+        doctor1,
+        { from: owner }
+      )
 
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      assert.equal(records.length, 2, "Should have two records");
-      assert.equal(records[0].cid, "QmCID1", "First record CID should match");
-      assert.equal(records[1].cid, "QmCID2", "Second record CID should match");
-    });
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      assert.equal(records.length, 2, 'Should have two records')
+      assert.equal(records[0].cid, 'QmCID1', 'First record CID should match')
+      assert.equal(records[1].cid, 'QmCID2', 'Second record CID should match')
+    })
 
-    it("should get medical record count for a patient", async () => {
-      await medicInstance.addMedicalRecord("QmCID1", "report1.pdf", patient1, "Diag1", "Treat1", { from: doctor1 });
-      await medicInstance.addMedicalRecord("QmCID2", "report2.pdf", patient1, "Diag2", "Treat2", { from: doctor1 });
+    it('should get medical record count for a patient', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report1.pdf', patient1, 'Diag1', 'Treat1', doctor1, {
+        from: owner,
+      })
+      await medicInstance.addMedicalRecordByAdmin('QmCID2', 'report2.pdf', patient1, 'Diag2', 'Treat2', doctor1, {
+        from: owner,
+      })
 
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      assert.equal(records.length, 2, "Should have 2 records");
-    });
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      assert.equal(records.length, 2, 'Should have 2 records')
+    })
 
-    it("should deactivate a medical record", async () => {
-      await medicInstance.addMedicalRecord("QmCID1", "report.pdf", patient1, "Diagnosis", "Treatment", { from: doctor1 });
+    it('should deactivate a medical record', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report.pdf', patient1, 'Diagnosis', 'Treatment', doctor1, {
+        from: owner,
+      })
 
-      const tx = await medicInstance.deactivateRecord(patient1, 0, { from: doctor1 });
+      const tx = await medicInstance.deactivateRecordByAdmin(patient1, 0, doctor1, { from: owner })
 
-      assert.equal(tx.logs[0].event, "RecordDeactivated", "Should emit deactivation event");
+      assert.equal(tx.logs[0].event, 'RecordDeactivated', 'Should emit deactivation event')
 
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      assert.isFalse(records[0].isActive, "Record should be deactivated");
-    });
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      assert.isFalse(records[0].isActive, 'Record should be deactivated')
+    })
 
-    it("should not allow unauthorized doctor to deactivate records", async () => {
-      await medicInstance.addMedicalRecord("QmCID1", "report.pdf", patient1, "Diagnosis", "Treatment", { from: doctor1 });
+    it('should not allow different doctor to deactivate another doctors record', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report.pdf', patient1, 'Diagnosis', 'Treatment', doctor1, {
+        from: owner,
+      })
 
-      // Register another doctor
-      await adminInstance.registerDoctor(doctor2, "Dr. Jones", "Neurology", "LIC002", { from: owner });
+      await adminInstance.registerDoctor(doctor2, 'Dr. Jones', 'Neurology', 'LIC002', { from: owner })
 
       try {
-        await medicInstance.deactivateRecord(patient1, 0, { from: doctor2 });
-        assert.fail("Should have thrown an error");
+        await medicInstance.deactivateRecordByAdmin(patient1, 0, doctor2, { from: owner })
+        assert.fail('Should have thrown an error')
       } catch (error) {
-        assert.include(error.message, "revert", "Should revert when different doctor tries to deactivate");
+        assert.include(error.message, 'revert', 'Should revert when different doctor tries to deactivate')
       }
-    });
-  });
+    })
+  })
 
-  describe("Edge Cases", () => {
-    it("should return empty array for patient with no records", async () => {
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      assert.isArray(records, "Should return an array");
-      assert.equal(records.length, 0, "Should be empty");
-    });
+  describe('Edge Cases', () => {
+    it('should return empty array for patient with no records', async () => {
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      assert.isArray(records, 'Should return an array')
+      assert.equal(records.length, 0, 'Should be empty')
+    })
 
-    it("should handle timestamp correctly", async () => {
-      await medicInstance.addMedicalRecord("QmCID1", "report.pdf", patient1, "Diagnosis", "Treatment", { from: doctor1 });
-      
-      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 });
-      
-      // FIX: Use Number() wrapper instead of .toNumber()
-      const timestamp = Number(records[0].timestamp);
-      
-      assert.isAbove(timestamp, 0, "Timestamp should be greater than 0");
-      assert.isBelow(timestamp, Math.floor(Date.now() / 1000) + 100, "Timestamp should be reasonable");
-    });
-  });
-});
+    it('should handle timestamp correctly', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report.pdf', patient1, 'Diagnosis', 'Treatment', doctor1, {
+        from: owner,
+      })
+
+      const records = await medicInstance.getMedicalRecords(patient1, { from: patient1 })
+      const timestamp = Number(records[0].timestamp)
+
+      assert.isAbove(timestamp, 0, 'Timestamp should be greater than 0')
+      assert.isBelow(timestamp, Math.floor(Date.now() / 1000) + 100, 'Timestamp should be reasonable')
+    })
+  })
+
+  describe('Doctor-Patient Relationship', () => {
+    it('should register patient link when adding first record', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report.pdf', patient1, 'Diag', 'Treat', doctor1, {
+        from: owner,
+      })
+
+      const patients = await medicInstance.getDoctorPatients(doctor1, { from: owner })
+      assert.equal(patients.length, 1, 'Doctor should have 1 patient')
+      assert.equal(patients[0], patient1, 'Patient address should match')
+    })
+
+    it('should not duplicate patient when adding multiple records', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report1.pdf', patient1, 'Diag1', 'Treat1', doctor1, {
+        from: owner,
+      })
+      await medicInstance.addMedicalRecordByAdmin('QmCID2', 'report2.pdf', patient1, 'Diag2', 'Treat2', doctor1, {
+        from: owner,
+      })
+
+      const patients = await medicInstance.getDoctorPatients(doctor1, { from: owner })
+      assert.equal(patients.length, 1, 'Should not duplicate patient')
+    })
+
+    it('should not allow doctor to view another doctors patients', async () => {
+      await medicInstance.addMedicalRecordByAdmin('QmCID1', 'report.pdf', patient1, 'Diag', 'Treat', doctor1, {
+        from: owner,
+      })
+
+      try {
+        await medicInstance.getDoctorPatients(doctor1, { from: doctor2 })
+        assert.fail('Should have thrown an error')
+      } catch (error) {
+        assert.include(error.message, 'revert', 'Should revert unauthorized access')
+      }
+    })
+  })
+})

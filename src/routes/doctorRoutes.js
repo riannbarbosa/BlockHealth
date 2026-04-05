@@ -1,13 +1,13 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const router = express.Router()
 const {
-    checkDoctorStatus,
-    getPatients,
-    addPatientRecord,
-    getPatientRecords,
-    checkPatientExists,
-    upload,
-} = require('../controllers/doctorController');
+  checkDoctorStatus,
+  getPatients,
+  addPatientRecord,
+  getPatientRecords,
+  checkPatientExists,
+  upload,
+} = require('../controllers/doctorController')
 
 /**
  * @swagger
@@ -46,12 +46,24 @@ const {
  * @swagger
  * /api/doctor/patients:
  *   get:
- *     summary: Get all patients
- *     description: Retrieves a list of all active patients in the system.
+ *     summary: Get patients attended by a doctor
+ *     description: Retrieves only the patients that have at least one medical record created by the requesting doctor.
  *     tags: [Doctor]
+ *     parameters:
+ *       - in: query
+ *         name: doctorId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The Ethereum address of the doctor
+ *         example: "0x742d35Cc8C4F8c7dd0f1e8a0b7B8e5F9E8A0F8C7"
  *     responses:
  *       200:
  *         description: Patients retrieved successfully
+ *       400:
+ *         description: doctorId ausente ou inválido
+ *       403:
+ *         description: Doctor not authorized
  *       500:
  *         description: Internal server error
  */
@@ -199,10 +211,10 @@ const {
  *         description: Internal server error
  */
 
-router.get('/doctors/:doctorId', checkDoctorStatus);
-router.get('/patients', getPatients);
-router.post('/records', upload.single('medicalFile'), addPatientRecord);
-router.get('/records/:patientId', getPatientRecords);
-router.get('/patients/:patientId/exists', checkPatientExists);
+router.get('/doctors/:doctorId', checkDoctorStatus)
+router.get('/patients', getPatients)
+router.post('/records', upload.single('medicalFile'), addPatientRecord)
+router.get('/records/:patientId', getPatientRecords)
+router.get('/patients/:patientId/exists', checkPatientExists)
 
-module.exports = router;
+module.exports = router

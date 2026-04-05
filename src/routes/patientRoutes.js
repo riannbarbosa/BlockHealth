@@ -1,14 +1,14 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const router = express.Router()
 
 const {
-    getPatientInfo,
-    getPatientMedicalRecords,
-    getPatientSelfRecords,
-    getPatientProfile,
-    selfRegisterPatient,
-    uploadSelfRecord,
-} = require('../controllers/patientController');
+  getPatientInfo,
+  getPatientMedicalRecords,
+  getPatientSelfRecords,
+  getPatientProfile,
+  selfRegisterPatient,
+  uploadSelfRecord,
+} = require('../controllers/patientController')
 /**
  * @swagger
  * tags:
@@ -396,10 +396,10 @@ const {
  *                   type: string
  */
 
-router.get('/:patientId', getPatientInfo);
-router.get('/:patientId/medical-records', getPatientMedicalRecords);
-router.get('/:patientId/records', getPatientSelfRecords);
-router.get('/:patientId/profile', getPatientProfile);
-router.post('/upload-record', uploadSelfRecord);
+router.get('/:patientId', getPatientInfo)
+router.get('/:patientId/medical-records', getPatientMedicalRecords)
+router.get('/:patientId/records', getPatientSelfRecords)
+router.get('/:patientId/profile', getPatientProfile)
+router.post('/upload-record', uploadSelfRecord)
 
-module.exports = router;
+module.exports = router

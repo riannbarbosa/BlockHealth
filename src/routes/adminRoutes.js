@@ -1,14 +1,14 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const router = express.Router()
 
 const {
-    addDoctor,
-    revokeDoctor,
-    addPatient,
-    deactivatePatient,
-    getAllPatients,
-    getAllDoctors
-} = require('../controllers/adminController');
+  addDoctor,
+  revokeDoctor,
+  addPatient,
+  deactivatePatient,
+  getAllPatients,
+  getAllDoctors,
+} = require('../controllers/adminController')
 
 /**
  * @swagger
@@ -511,12 +511,11 @@ const {
  *                 error:
  *                   type: string
  */
-router.post('/doctors', addDoctor);
-router.delete('/doctors/:doctorId', revokeDoctor);
-router.post('/patients', addPatient);
-router.delete('/patients/:patientId', deactivatePatient);
-router.get('/patients', getAllPatients);
-router.get('/doctors', getAllDoctors);
+router.post('/doctors', addDoctor)
+router.delete('/doctors/:doctorId', revokeDoctor)
+router.post('/patients', addPatient)
+router.delete('/patients/:patientId', deactivatePatient)
+router.get('/patients', getAllPatients)
+router.get('/doctors', getAllDoctors)
 
-module.exports = router;
-
+module.exports = router

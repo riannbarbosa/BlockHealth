@@ -26,6 +26,10 @@ contract MedicContract {
     mapping(address => MedicalRecord[]) public patientRecords;
     mapping(address => bool) public authorizedDoctors;
 
+
+    mapping(address => address[]) private doctorPatients;
+    mapping(address => mapping(address => bool)) private doctorHasPatient;
+
     event RecordAdded(string cid, address patientId, address doctorId);
     event RecordDeactivated(address patientId, uint256 recordIndex);
     event AdminContractUpdated(address newAdminContract);
@@ -87,7 +91,7 @@ contract MedicContract {
         authorizedDoctors[_doctorId] = false;
     }
 
-       function addMedicalRecordByAdmin(
+    function addMedicalRecordByAdmin(
         string memory _cid,
         string memory _fileName,
         address _patientId,
@@ -109,37 +113,47 @@ contract MedicContract {
                 isActive: true
             })
         );
+
+        if (!doctorHasPatient[_doctorId][_patientId]) {
+            doctorPatients[_doctorId].push(_patientId);
+            doctorHasPatient[_doctorId][_patientId] = true;
+        }
+
         emit RecordAdded(_cid, _patientId, _doctorId);
     }
     
-    function addMedicalRecord(
-        string memory _cid,
-        string memory _fileName,
-        address _patientId,
-        string memory _diagnosis,
-        string memory _treatment
-    ) public onlyAuthorizedDoctor patientActive(_patientId) {
-        patientRecords[_patientId].push(
-            MedicalRecord({
-                cid: _cid,
-                fileName: _fileName,
-                patientId: _patientId,
-                diagnosis: _diagnosis,
-                treatment: _treatment,
-                doctorId: msg.sender,
-                timestamp: block.timestamp,
-                isActive: true
-            })
-        );
-        emit RecordAdded(_cid, _patientId, msg.sender);
-    }
+ //   function addMedicalRecord(
+ //       string memory _cid,
+ //       string memory _fileName,
+ //       address _patientId,
+ //       string memory _diagnosis,
+ //       string memory _treatment
+ //   ) public onlyAuthorizedDoctor patientActive(_patientId) {
+ //       patientRecords[_patientId].push(
+//          MedicalRecord({
+//                cid: _cid,
+ //               fileName: _fileName,
+ //               patientId: _patientId,
+ //               diagnosis: _diagnosis,
+ //               treatment: _treatment,
+ //               doctorId: msg.sender,
+ //               timestamp: block.timestamp,
+ //               isActive: true
+  //          })
+  //      );
+  //      emit RecordAdded(_cid, _patientId, msg.sender);
+  //  }
 
-   function deactivateRecord(address _patientId, uint256 _recordIndex) public onlyAuthorizedDoctor patientActive(_patientId) {
+   function deactivateRecordByAdmin( 
+    address _patientId,
+    uint256 _recordIndex,
+    address _doctorId
+    ) public onlyAuthorizedDoctor patientActive(_patientId) {
        require(_recordIndex < patientRecords[_patientId].length, "Invalid record index");
-       require(
-           patientRecords[_patientId][_recordIndex].doctorId == msg.sender,
-           "Only record creator can deactivate"
-       );
+        require(
+        patientRecords[_patientId][_recordIndex].doctorId == _doctorId,
+        "Only record creator can deactivate"
+        );
        patientRecords[_patientId][_recordIndex].isActive = false;
        emit RecordDeactivated(_patientId, _recordIndex);
    }
@@ -148,6 +162,18 @@ contract MedicContract {
        require(msg.sender == _patientId || msg.sender == adminContract ||  authorizedDoctors[msg.sender], "Unauthorized access");
        return patientRecords[_patientId];
    }
+
+   function getDoctorPatients(address _doctorId) 
+    public 
+    view 
+    returns (address[] memory) 
+    {
+        require(
+            msg.sender == _doctorId || msg.sender == adminContract,
+            "Unauthorized"
+        );
+        return doctorPatients[_doctorId];
+    }
 
    function getActiveMedicalRecords(address _patientId) public view returns (MedicalRecord[] memory) {
        require(msg.sender == _patientId || msg.sender == patientContract || authorizedDoctors[msg.sender], "Unauthorized access");
