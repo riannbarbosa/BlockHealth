@@ -187,7 +187,7 @@ contract('MedicContract', accounts => {
         from: owner,
       })
 
-      const tx = await medicInstance.deactivateRecordByAdmin(patient1, 0, doctor1, { from: owner })
+      const tx = await medicInstance.deactivateRecordByAdmin(patient1, 0, doctor1, { from: doctor1 })
 
       assert.equal(tx.logs[0].event, 'RecordDeactivated', 'Should emit deactivation event')
 
@@ -237,7 +237,7 @@ contract('MedicContract', accounts => {
         from: owner,
       })
 
-      const patients = await medicInstance.getDoctorPatients(doctor1, { from: owner })
+      const patients = await medicInstance.getDoctorPatients(doctor1, { from: doctor1 })
       assert.equal(patients.length, 1, 'Doctor should have 1 patient')
       assert.equal(patients[0], patient1, 'Patient address should match')
     })
@@ -250,7 +250,7 @@ contract('MedicContract', accounts => {
         from: owner,
       })
 
-      const patients = await medicInstance.getDoctorPatients(doctor1, { from: owner })
+      const patients = await medicInstance.getDoctorPatients(doctor1, { from: doctor1 })
       assert.equal(patients.length, 1, 'Should not duplicate patient')
     })
 
