@@ -97,6 +97,12 @@ ENCRYPTION_SECRET=your_very_secure_encryption_secret_here_change_in_production
 
 ## 🏃 Running the Application
 
+> **Note**: Make sure you have compiled and deployed the smart contracts before starting the server:
+> ```bash
+> truffle compile
+> truffle migrate --reset --network development
+> ```
+
 ### Start the API Server
 
 ```bash
