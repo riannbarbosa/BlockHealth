@@ -6,7 +6,6 @@ const path = require('path');
 const adminController = require('../controllers/adminController');
 const doctorController = require('../controllers/doctorController');
 const patientController = require('../controllers/patientController');
-const fileRoutes = require('../routes/fileRoutes') ;
 
 let provider
 let signer
@@ -91,6 +90,7 @@ const setupContract = async app => {
     adminController.initializeContracts(contracts);
     doctorController.initializeContracts(contracts);
     patientController.initializeContracts(contracts);
+    const fileRoutes = require('../routes/fileRoutes');
     fileRoutes.initializeContracts(contracts);
 
     // Add contract information to app for debugging
