@@ -159,7 +159,7 @@ contract MedicContract {
    }
 
    function getMedicalRecords(address _patientId) public view returns (MedicalRecord[] memory) {
-       require(msg.sender == _patientId || msg.sender == adminContract ||  authorizedDoctors[msg.sender], "Unauthorized access");
+       require(msg.sender == _patientId || msg.sender == adminContract || msg.sender == owner || authorizedDoctors[msg.sender], "Unauthorized access");
        return patientRecords[_patientId];
    }
 
@@ -176,7 +176,7 @@ contract MedicContract {
     }
 
    function getActiveMedicalRecords(address _patientId) public view returns (MedicalRecord[] memory) {
-       require(msg.sender == _patientId || msg.sender == patientContract || authorizedDoctors[msg.sender], "Unauthorized access");
+       require(msg.sender == _patientId || msg.sender == patientContract || msg.sender == owner || authorizedDoctors[msg.sender], "Unauthorized access");
        uint256 activeCount = 0;
        MedicalRecord[] storage records = patientRecords[_patientId];
 

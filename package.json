@@ -9,12 +9,16 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "truffle test --network test"
+    "test": "truffle test --network test",  
+    "migrate-test": "truffle migrate --network test",
+    "migrate-dev": "truffle migrate --network development",
+    "redeploy-test": "truffle migrate --network test --reset",
+    "redeploy-dev": "truffle migrate --network development --reset"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/riannbarbosa/HealthMgmt-Contract-TCCII.git"
-  },
+  }, 
   "author": "Rian Barbosa",
   "license": "ISC",
   "bugs": {
