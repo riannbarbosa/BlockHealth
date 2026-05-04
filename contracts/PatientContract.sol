@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.9.0;
+pragma solidity ^0.8.13;
 
 contract PatientContract {
+    error PatientNotRegistered();
+    error NotAuthorized();
+    error EmptyCID();
+    error EmptyFileName();
+    error RecordIndexOutOfBounds();
+    error MedicContractNotSet();
+    error FetchRecordsFailed();
+    error OnlyAdmin();
+
     address public medicContract;
     address public adminContract;
 
@@ -10,32 +19,34 @@ contract PatientContract {
         adminContract = _adminContract;
     }
 
+    // Struct com mesmo layout do MedicContract para decode ABI
     struct MedicalRecord {
         string cid;
         string fileName;
-        address patientId;
         string diagnosis;
         string treatment;
-        address doctorId;
-        uint256 timestamp;
-        bool isActive;
+        address patientId;   // 20 bytes \
+        uint96 timestamp;    // 12 bytes / = 32 bytes (1 slot)
+        address doctorId;    // 20 bytes \
+        bool isActive;       // 1 byte   / = 21 bytes (1 slot)
     }
 
+    // Struct packing
     struct SelfUploadedRecord {
         string cid;
         string fileName;
         string recordType;
         string description;
-        uint256 timestamp;
-        bool isEncrypted;
+        uint96 timestamp;    // 12 bytes \
+        bool isEncrypted;    // 1 byte   / = 13 bytes (1 slot)
     }
 
     struct PatientProfile {
         string name;
         string email;
         string phoneNumber;
-        bool profileCompleted;
-        uint256 lastUpdated;
+        uint96 lastUpdated;      // 12 bytes \
+        bool profileCompleted;   // 1 byte   / = 13 bytes (1 slot)
     }
 
     mapping(address => SelfUploadedRecord[]) public patientSelfRecords;
@@ -46,26 +57,20 @@ contract PatientContract {
     event PatientRegistered(address indexed patientId);
 
     modifier onlyPatient() {
-        require(isPatientRegistered(msg.sender), "Patient not registered");
+        if (!isPatientRegistered(msg.sender)) revert PatientNotRegistered();
         _;
     }
 
     modifier onlyValidPatient(address patientId) {
-        require(isPatientRegistered(patientId), "Patient not registered");
+        if (!isPatientRegistered(patientId)) revert PatientNotRegistered();
         _;
     }
 
     modifier onlyPatientOrDoctor(address patientId) {
-        require(
-            msg.sender == patientId || 
-            isDoctorAuthorized(msg.sender),
-            "Not authorized"
-        );
+        if (msg.sender != patientId && !isDoctorAuthorized(msg.sender)) revert NotAuthorized();
         _;
     }
 
-
-    // Doctor authorization check
     function isDoctorAuthorized(address caller) public view returns (bool) {
         if (medicContract != address(0)) {
             (bool success, bytes memory data) = medicContract.staticcall(
@@ -75,127 +80,104 @@ contract PatientContract {
         }
         return false;
     }
-    // Check if patient is registered in the admin contract
+
     function isPatientRegistered(address patientId) public view returns (bool) {
-            (bool success, bytes memory data) = adminContract.staticcall(
-                abi.encodeWithSignature("isPatientActive(address)", patientId)
-            );
+        (bool success, bytes memory data) = adminContract.staticcall(
+            abi.encodeWithSignature("isPatientActive(address)", patientId)
+        );
         return success && abi.decode(data, (bool));
     }
 
-    function _isPatientActiveInAdmin(address patientId) private view returns (bool) {
-        if (adminContract != address(0)) {
-            (bool success, bytes memory data) = adminContract.staticcall(
-                abi.encodeWithSignature("isPatientActive(address)", patientId)
-            );
-            return success && abi.decode(data, (bool));
-        }
-        return false;
-    }
-
-
-    // Update patient profile
     function updateProfile(
-        string memory _name,
-        string memory _email,
-        string memory _phoneNumber
+        string calldata _name,
+        string calldata _email,
+        string calldata _phoneNumber
     ) public onlyPatient {
-        patientProfiles[msg.sender].name = _name;
-        patientProfiles[msg.sender].email = _email;
-        patientProfiles[msg.sender].phoneNumber = _phoneNumber;
-        patientProfiles[msg.sender].lastUpdated = block.timestamp;
+        PatientProfile storage profile = patientProfiles[msg.sender];
+        profile.name = _name;
+        profile.email = _email;
+        profile.phoneNumber = _phoneNumber;
+        profile.lastUpdated = uint96(block.timestamp);
         
         emit ProfileUpdated(msg.sender);
     }
 
-    // Upload medical record by patient themselves
     function uploadSelfRecord(
-        string memory _cid,
-        string memory _fileName,
-        string memory _recordType,
-        string memory _description
+        string calldata _cid,
+        string calldata _fileName,
+        string calldata _recordType,
+        string calldata _description
     ) public onlyPatient {
-        require(bytes(_cid).length > 0, "CID cannot be empty");
-        require(bytes(_fileName).length > 0, "File name cannot be empty");
+        if (bytes(_cid).length == 0) revert EmptyCID();
+        if (bytes(_fileName).length == 0) revert EmptyFileName();
         
-        SelfUploadedRecord memory newRecord = SelfUploadedRecord({
+        patientSelfRecords[msg.sender].push(SelfUploadedRecord({
             cid: _cid,
             fileName: _fileName,
             recordType: _recordType,
             description: _description,
-            timestamp: block.timestamp,
+            timestamp: uint96(block.timestamp),
             isEncrypted: true
-        });
-        
-        patientSelfRecords[msg.sender].push(newRecord);
+        }));
         
         emit SelfRecordUploaded(msg.sender, _cid, _fileName);
     }
 
-    // Get all self-uploaded records for a patient
     function getMySelfRecords() public view onlyPatient returns (SelfUploadedRecord[] memory) {
         return patientSelfRecords[msg.sender];
     }
 
-    // Get specific self-uploaded record
     function getMySelfRecord(uint256 _index) public view onlyPatient returns (SelfUploadedRecord memory) {
-        require(_index < patientSelfRecords[msg.sender].length, "Record index out of bounds");
+        if (_index >= patientSelfRecords[msg.sender].length) revert RecordIndexOutOfBounds();
         return patientSelfRecords[msg.sender][_index];
     }
 
-    // Get all medical records from main contract (doctor-uploaded records)
     function getMyMedicalRecords() public view onlyPatient returns (MedicalRecord[] memory) {
-        require(medicContract != address(0), "Main contract not set");
+        if (medicContract == address(0)) revert MedicContractNotSet();
 
         (bool success, bytes memory data) = medicContract.staticcall(
             abi.encodeWithSignature("getActiveMedicalRecords(address)", msg.sender)
         );
         
-        require(success, "Failed to fetch medical records");
+        if (!success) revert FetchRecordsFailed();
         return abi.decode(data, (MedicalRecord[]));
     }
 
-    // Get patient profile
     function getMyProfile() public view onlyPatient returns (PatientProfile memory) {
         return patientProfiles[msg.sender];
     }
 
-    // Get patient profile by address (for authorized access)
     function getPatientProfile(address patientId) public view onlyValidPatient(patientId) returns (PatientProfile memory) {
-        // This could be restricted to doctors or admin in a more complex system
         return patientProfiles[patientId];
     }
 
-    // Get count of self-uploaded records
     function getMySelfRecordCount() public view onlyPatient returns (uint256) {
         return patientSelfRecords[msg.sender].length;
     }
 
-    // Delete a self-uploaded record
     function deleteSelfRecord(uint256 _index) public onlyPatient {
-        require(_index < patientSelfRecords[msg.sender].length, "Record index out of bounds");
+        SelfUploadedRecord[] storage records = patientSelfRecords[msg.sender];
+        if (_index >= records.length) revert RecordIndexOutOfBounds();
         
-        // Move the last element to the deleted position and pop
-        uint256 lastIndex = patientSelfRecords[msg.sender].length - 1;
+        uint256 lastIndex = records.length - 1;
         if (_index != lastIndex) {
-            patientSelfRecords[msg.sender][_index] = patientSelfRecords[msg.sender][lastIndex];
+            records[_index] = records[lastIndex];
         }
-        patientSelfRecords[msg.sender].pop();
+        records.pop();
     }
 
-    // Update a self-uploaded record
     function updateSelfRecord(
         uint256 _index,
-        string memory _recordType,
-        string memory _description
+        string calldata _recordType,
+        string calldata _description
     ) public onlyPatient {
-        require(_index < patientSelfRecords[msg.sender].length, "Record index out of bounds");
+        if (_index >= patientSelfRecords[msg.sender].length) revert RecordIndexOutOfBounds();
         
-        patientSelfRecords[msg.sender][_index].recordType = _recordType;
-        patientSelfRecords[msg.sender][_index].description = _description;
+        SelfUploadedRecord storage record = patientSelfRecords[msg.sender][_index];
+        record.recordType = _recordType;
+        record.description = _description;
     }
 
-    // Emergency function to verify patient identity
     function verifyPatientIdentity(address patientId) public view returns (bool, string memory) {
         if (isPatientRegistered(patientId)) {
             return (true, patientProfiles[patientId].name);
@@ -203,18 +185,16 @@ contract PatientContract {
         return (false, "");
     }
 
-    // Admin functions (can be called by contract admin)
     function updateMedicContract(address _newContract) public {
-        require(msg.sender == adminContract, "Only admin can update");
+        if (msg.sender != adminContract) revert OnlyAdmin();
         medicContract = _newContract;
     }
 
     function updateAdminContract(address _newContract) public {
-        require(msg.sender == adminContract, "Only admin can update");
+        if (msg.sender != adminContract) revert OnlyAdmin();
         adminContract = _newContract;
     }
 
-    // Get all self-uploaded records for a patient (for admin/doctor access)
     function getPatientSelfRecords(address patientId) public view 
         onlyValidPatient(patientId)
         onlyPatientOrDoctor(patientId)

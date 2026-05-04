@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.9.0;
+pragma solidity ^0.8.13;
 
 contract AdminContract {
+    error OnlyOwner();
+    error DoctorNotAuthorized();
+    error PatientNotActive();
+    error DoctorAlreadyRegistered();
+    error InvalidAddress();
+    error PatientAlreadyRegistered();
+    error MedicContractCallFailed();
+    error InvalidOwnerAddress();
+
     address public owner;
     address public medicContract;
 
@@ -9,23 +18,24 @@ contract AdminContract {
         owner = msg.sender;
     }
 
+    // Struct packing: address(20) + bool(1) + uint88(11) = 32 bytes (1 slot)
     struct Doctor {
-        address id;
         string name;
         string specialization;
         string licenseNumber;
-        bool isAuthorized;
-        uint256 registrationDate;
+        address id;              // 20 bytes \
+        bool isAuthorized;       // 1 byte   |
+        uint88 registrationDate; // 11 bytes / = 32 bytes (1 slot)
     }
 
     struct Patient {
-        address id;
         string name;
         string dateOfBirth;
         string phoneNumber;
         string emergencyContact;
-        bool isActive;
-        uint256 registrationDate;
+        address id;              // 20 bytes \
+        bool isActive;           // 1 byte   |
+        uint88 registrationDate; // 11 bytes / = 32 bytes (1 slot)
     }
 
     mapping(address => Doctor) public doctors;
@@ -40,29 +50,28 @@ contract AdminContract {
     event MedicContractUpdated(address indexed newContract);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
     modifier doctorExists(address doctorId) {
-        require(doctors[doctorId].isAuthorized, "Doctor does not exist or is not authorized");
+        if (!doctors[doctorId].isAuthorized) revert DoctorNotAuthorized();
         _;
     }
 
     modifier patientExists(address patientId) {
-        require(patients[patientId].isActive, "Patient does not exist or is not active");
+        if (!patients[patientId].isActive) revert PatientNotActive();
         _;
     }
 
-    // Doctor management functions
     function registerDoctor(
         address _doctorId,
-        string memory _name,
-        string memory _specialization,
-        string memory _licenseNumber
+        string calldata _name,
+        string calldata _specialization,
+        string calldata _licenseNumber
     ) public onlyOwner {
-        require(!doctors[_doctorId].isAuthorized, "Doctor already registered");
-        require(_doctorId != address(0), "Invalid doctor address");
+        if (doctors[_doctorId].isAuthorized) revert DoctorAlreadyRegistered();
+        if (_doctorId == address(0)) revert InvalidAddress();
         
         doctors[_doctorId] = Doctor({
             id: _doctorId,
@@ -70,7 +79,7 @@ contract AdminContract {
             specialization: _specialization,
             licenseNumber: _licenseNumber,
             isAuthorized: true,
-            registrationDate: block.timestamp
+            registrationDate: uint88(block.timestamp)
         });
         
         doctorList.push(_doctorId);
@@ -79,19 +88,18 @@ contract AdminContract {
             (bool success, ) = medicContract.call(
                 abi.encodeWithSignature("authorizeDoctor(address)", _doctorId)
             );
-            require(success, "Failed to authorize doctor in medic contract");
+            if (!success) revert MedicContractCallFailed();
         }
         
         emit DoctorRegistered(_doctorId, _name, _specialization);
     }
 
     function revokeDoctor(address _doctorId) public onlyOwner doctorExists(_doctorId) {
-        // Call the main contract to revoke doctor
         if (medicContract != address(0)) {
             (bool success, ) = medicContract.call(
                 abi.encodeWithSignature("revokeDoctor(address)", _doctorId)
             );
-            require(success, "Failed to revoke doctor in medic contract");
+            if (!success) revert MedicContractCallFailed();
         }
 
         doctors[_doctorId].isAuthorized = false;
@@ -101,25 +109,25 @@ contract AdminContract {
 
     function updateDoctorInfo(
         address _doctorId,
-        string memory _name,
-        string memory _specialization,
-        string memory _licenseNumber
+        string calldata _name,
+        string calldata _specialization,
+        string calldata _licenseNumber
     ) public onlyOwner doctorExists(_doctorId) {
-        doctors[_doctorId].name = _name;
-        doctors[_doctorId].specialization = _specialization;
-        doctors[_doctorId].licenseNumber = _licenseNumber;
+        Doctor storage doc = doctors[_doctorId];
+        doc.name = _name;
+        doc.specialization = _specialization;
+        doc.licenseNumber = _licenseNumber;
     }
 
-    // Patient management functions
     function registerPatient(
         address _patientId,
-        string memory _name,
-        string memory _dateOfBirth,
-        string memory _phoneNumber,
-        string memory _emergencyContact
+        string calldata _name,
+        string calldata _dateOfBirth,
+        string calldata _phoneNumber,
+        string calldata _emergencyContact
     ) public onlyOwner {
-        require(!patients[_patientId].isActive, "Patient already registered");
-        require(_patientId != address(0), "Invalid patient address");
+        if (patients[_patientId].isActive) revert PatientAlreadyRegistered();
+        if (_patientId == address(0)) revert InvalidAddress();
         
         patients[_patientId] = Patient({
             id: _patientId,
@@ -128,7 +136,7 @@ contract AdminContract {
             phoneNumber: _phoneNumber,
             emergencyContact: _emergencyContact,
             isActive: true,
-            registrationDate: block.timestamp
+            registrationDate: uint88(block.timestamp)
         });
         
         patientList.push(_patientId);
@@ -143,58 +151,63 @@ contract AdminContract {
 
     function updatePatientInfo(
         address _patientId,
-        string memory _name,
-        string memory _dateOfBirth,
-        string memory _phoneNumber,
-        string memory _emergencyContact
+        string calldata _name,
+        string calldata _dateOfBirth,
+        string calldata _phoneNumber,
+        string calldata _emergencyContact
     ) public onlyOwner patientExists(_patientId) {
-        patients[_patientId].name = _name;
-        patients[_patientId].dateOfBirth = _dateOfBirth;
-        patients[_patientId].phoneNumber = _phoneNumber;
-        patients[_patientId].emergencyContact = _emergencyContact;
+        Patient storage pat = patients[_patientId];
+        pat.name = _name;
+        pat.dateOfBirth = _dateOfBirth;
+        pat.phoneNumber = _phoneNumber;
+        pat.emergencyContact = _emergencyContact;
     }
 
     function getAllDoctors() public view returns (Doctor[] memory) {
-        uint256 activeCount = 0;
+        uint256 len = doctorList.length;
+        uint256 activeCount;
         
-        // Count active doctors
-        for (uint256 i = 0; i < doctorList.length; i++) {
+        for (uint256 i; i < len; ) {
             if (doctors[doctorList[i]].isAuthorized) {
-                activeCount++;
+                unchecked { ++activeCount; }
             }
+            unchecked { ++i; }
         }
         
         Doctor[] memory activeDoctors = new Doctor[](activeCount);
-        uint256 index = 0;
+        uint256 index;
         
-        for (uint256 i = 0; i < doctorList.length; i++) {
+        for (uint256 i; i < len; ) {
             if (doctors[doctorList[i]].isAuthorized) {
                 activeDoctors[index] = doctors[doctorList[i]];
-                index++;
+                unchecked { ++index; }
             }
+            unchecked { ++i; }
         }
         
         return activeDoctors;
     }
 
     function getAllPatients() public view returns (Patient[] memory) {
-        uint256 activeCount = 0;
+        uint256 len = patientList.length;
+        uint256 activeCount;
         
-        // Count active patients
-        for (uint256 i = 0; i < patientList.length; i++) {
+        for (uint256 i; i < len; ) {
             if (patients[patientList[i]].isActive) {
-                activeCount++;
+                unchecked { ++activeCount; }
             }
+            unchecked { ++i; }
         }
         
         Patient[] memory activePatients = new Patient[](activeCount);
-        uint256 index = 0;
+        uint256 index;
         
-        for (uint256 i = 0; i < patientList.length; i++) {
+        for (uint256 i; i < len; ) {
             if (patients[patientList[i]].isActive) {
                 activePatients[index] = patients[patientList[i]];
-                index++;
+                unchecked { ++index; }
             }
+            unchecked { ++i; }
         }
         
         return activePatients;
@@ -216,14 +229,13 @@ contract AdminContract {
         return patients[_patientId].isActive;
     }
 
-    // Admin functions
     function updateMedicContract(address _newContract) public onlyOwner {
         medicContract = _newContract;
         emit MedicContractUpdated(_newContract);
     }
 
     function transferOwnership(address _newOwner) public onlyOwner {
-        require(_newOwner != address(0), "Invalid new owner address");
+        if (_newOwner == address(0)) revert InvalidOwnerAddress();
         owner = _newOwner;
     }
 }
